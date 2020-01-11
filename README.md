@@ -2,14 +2,15 @@
 
 Derive Serialize and Deserialize that replaces struct keys with numerical indices.
 
-Supports `skip_serializing_if` for optional keys.
+**WIP**. Primary use case is to handle CTAP CBOR messages.
 
-**WIP**. Use case is to handle CTAP CBOR messages.
+Missing features:
+- `skip_serializing_if` for optional keys.
+- configurable index offset
 
-This is my attempt to learn and use using proc-macros,
-I'm following along with [`serde-repr`][serde-repr].
+This is my attempt to learn proc-macros, I'm roughly following [`serde-repr`][serde-repr].
 
-To "see" the generated code, run `cargo expand --test basics`.
+Tip: To "see" the generated code, run `cargo expand --test basics`.
 
 [serde-repr]: https://github.com/dtolnay/serde-repr
 

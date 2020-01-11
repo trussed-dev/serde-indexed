@@ -1,10 +1,6 @@
-// use syn::parse::{Error, Parse, ParseStream, Parser, Result};
-// use syn::{parenthesized, Data, DeriveInput, Fields, Ident, Meta, NestedMeta};
-
 use proc_macro2::Span;
 use syn::parse::{Error, Parse, ParseStream, Result};
-use syn::{Data, DeriveInput, Fields, Ident};
-use syn::Token;
+use syn::{Data, DeriveInput, Fields, Ident, Token};
 
 pub struct Input {
     pub ident: Ident,
@@ -21,7 +17,6 @@ pub struct Field {
 }
 
 impl Parse for Input {
-
     fn parse(input: ParseStream) -> Result<Self> {
         let call_site = Span::call_site();
         let derive_input = DeriveInput::parse(input)?;
@@ -80,4 +75,3 @@ fn fields_from_ast<'a>(
         })
         .collect()
 }
-
