@@ -1,17 +1,32 @@
-## Overview
+## serde-indexed
 
-Derive Serialize and Deserialize that replaces struct keys with numerical indices.
+Derivation of [`Serialize`][serialize] and [`Deserialize`][deserialize] that replaces struct keys with numerical indices.
 
-**WIP**. Primary use case is to handle CTAP CBOR messages.
+Primary use case is to handle [CTAP CBOR][ctap-cbor] messages, in particular support for:
+- [`skip_serializing_if`][skip-serializing-if] for optional keys
+- configurable index `offset`
 
-Missing features:
-- `skip_serializing_if` for optional keys.
-- configurable index offset
+#### Example
 
-This is my attempt to learn proc-macros, I'm roughly following [`serde-repr`][serde-repr].
+```rust
+#[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
+#[serde_indexed(offset = 1)]
+pub struct SomeKeys {
+    pub number: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub option: Option<u8>,
+    pub bytes: [u8; 7],
+}
+```
 
-Tip: To "see" the generated code, run `cargo expand --test basics`.
+This was a nice opportunity to learn proc-macros, I roughly followed [`serde-repr`][serde-repr].
 
+To see some generated code, run `cargo expand --test basics`.
+
+[serialize]: https://docs.serde.rs/serde/ser/trait.Serialize.html
+[deserialize]: https://docs.serde.rs/serde/de/trait.Deserialize.html
+[ctap-cbor]: https://fidoalliance.org/specs/fido-v2.0-ps-20190130/fido-client-to-authenticator-protocol-v2.0-ps-20190130.html#ctap2-canonical-cbor-encoding-form
+[skip-serializing-if]: https://serde.rs/field-attrs.html#skip_serializing_if
 [serde-repr]: https://github.com/dtolnay/serde-repr
 
 #### License
