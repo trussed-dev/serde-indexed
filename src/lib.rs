@@ -1,7 +1,7 @@
 /*! Derivation of [`Serialize`][serialize] and [`Deserialize`][deserialize] that replaces struct keys with numerical indices.
 
 ### Usage example
-The macros currently understand `serde`'s [`skip_if_serialized`][skip-serializing-if] field attribute
+The macros currently understand `serde`'s [`skip_serializing_if`][skip-serializing-if] field attribute
 and a custom `offset` container attribute.
 
 ```
@@ -31,7 +31,7 @@ extern crate proc_macro;
 mod parse;
 
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::parse_macro_input;
 
 use crate::parse::Input;
@@ -69,10 +69,10 @@ fn count_serialized_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStr
             let member = &field.member;
             match &field.skip_serializing_if {
                 Some(path) => {
-                    quote! { + if #path(&self.#member) { 0 } else { 1 } }
+                    quote! { if #path(&self.#member) { 0 } else { 1 } }
                 }
                 None => {
-                    quote! { + 1 }
+                    quote! { 1 }
                 }
             }
         })
@@ -93,9 +93,7 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
                 S: serde::Serializer
             {
                 use serde::ser::SerializeMap;
-                let num_fields = 0
-                    #(#num_fields)*
-                ;
+                let num_fields = 0 #( + #num_fields)*;
                 let mut map = serializer.serialize_map(Some(num_fields))?;
 
                 #(#serialize_fields)*
@@ -110,7 +108,7 @@ fn none_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStream> {
     fields
         .iter()
         .map(|field| {
-            let ident = syn::Ident::new(&field.label, proc_macro2::Span::call_site());
+            let ident = format_ident!("{}", &field.label);
             quote! {
                 let mut #ident = None;
             }
@@ -123,7 +121,7 @@ fn unwrap_expected_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStre
         .iter()
         .map(|field| {
             let label = field.label.clone();
-            let ident = syn::Ident::new(&field.label, proc_macro2::Span::call_site());
+            let ident = format_ident!("{}", &field.label);
             if field.skip_serializing_if.is_none() {
                 quote! {
                     let #ident = #ident.ok_or_else(|| serde::de::Error::missing_field(#label))?;
@@ -143,7 +141,7 @@ fn match_fields(fields: &[parse::Field], offset: usize) -> Vec<proc_macro2::Toke
         .iter()
         .map(|field| {
             let label = field.label.clone();
-            let ident = syn::Ident::new(&field.label, proc_macro2::Span::call_site());
+            let ident = format_ident!("{}", &field.label);
             let index = field.index + offset;
             quote! {
                 #index => {
@@ -161,7 +159,7 @@ fn all_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStream> {
     fields
         .iter()
         .map(|field| {
-            let ident = syn::Ident::new(&field.label, proc_macro2::Span::call_site());
+            let ident = format_ident!("{}", &field.label);
             quote! {
                 #ident
             }
