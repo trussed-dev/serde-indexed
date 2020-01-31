@@ -178,7 +178,7 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
 
     TokenStream::from(quote! {
         impl<'de> serde::Deserialize<'de> for #ident {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
             where
                 D: serde::Deserializer<'de>,
             {
@@ -191,7 +191,7 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
                         formatter.write_str(stringify!(#ident))
                     }
 
-                    fn visit_map<V>(self, mut map: V) -> Result<#ident, V::Error>
+                    fn visit_map<V>(self, mut map: V) -> core::result::Result<#ident, V::Error>
                     where
                         V: serde::de::MapAccess<'de>,
                     {
