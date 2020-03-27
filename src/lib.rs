@@ -197,8 +197,12 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
                     {
                         #(#none_fields)*
 
-                        while let Some(key) = map.next_key()? {
-                            match key {
+                        // NB: In the previous "none_fields", we use the actual struct's
+                        // keys as variable names. If the struct happens to have a key
+                        // named "key", it would clash with __serde_indexed_internal_key,
+                        // if that were named key.
+                        while let Some(__serde_indexed_internal_key) = map.next_key()? {
+                            match __serde_indexed_internal_key {
                                 #(#match_fields)*
                                 _ => {
                                     return Err(serde::de::Error::duplicate_field("inexistent field index"));

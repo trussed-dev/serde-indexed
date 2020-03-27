@@ -50,6 +50,14 @@ mod some_keys {
         pub vector: heapless::Vec<u8, consts::U16>,
     }
 
+    #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
+    // #[serde_indexed(offset = 1)]
+    pub struct NakedOption {
+        pub option: Option<SomeKeys>,
+        pub num: usize,
+        pub key: bool,
+    }
+
     fn an_example() -> SomeKeys {
         let mut string = heapless::String::new();
         string.push_str("so serde").unwrap();
