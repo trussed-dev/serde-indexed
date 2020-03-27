@@ -58,6 +58,10 @@ mod some_keys {
         pub key: bool,
     }
 
+    #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
+    // #[serde_indexed(offset = 1)]
+    pub struct EmptyStruct {}
+
     fn an_example() -> SomeKeys {
         let mut string = heapless::String::new();
         string.push_str("so serde").unwrap();

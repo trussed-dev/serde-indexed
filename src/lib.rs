@@ -176,6 +176,25 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     let match_fields = match_fields(&input.fields, input.attrs.offset);
     let all_fields = all_fields(&input.fields);
 
+    let the_loop = if input.fields.len() > 0 {
+        // NB: In the previous "none_fields", we use the actual struct's
+        // keys as variable names. If the struct happens to have a key
+        // named "key", it would clash with __serde_indexed_internal_key,
+        // if that were named key.
+        quote! {
+            while let Some(__serde_indexed_internal_key) = map.next_key()? {
+                match __serde_indexed_internal_key {
+                    #(#match_fields)*
+                    _ => {
+                        return Err(serde::de::Error::duplicate_field("inexistent field index"));
+                    }
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     TokenStream::from(quote! {
         impl<'de> serde::Deserialize<'de> for #ident {
             fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
@@ -197,18 +216,7 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
                     {
                         #(#none_fields)*
 
-                        // NB: In the previous "none_fields", we use the actual struct's
-                        // keys as variable names. If the struct happens to have a key
-                        // named "key", it would clash with __serde_indexed_internal_key,
-                        // if that were named key.
-                        while let Some(__serde_indexed_internal_key) = map.next_key()? {
-                            match __serde_indexed_internal_key {
-                                #(#match_fields)*
-                                _ => {
-                                    return Err(serde::de::Error::duplicate_field("inexistent field index"));
-                                }
-                            }
-                        }
+                        #the_loop
 
                         #(#unwrap_expected_fields)*
 
