@@ -83,11 +83,12 @@ fn count_serialized_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStr
 pub fn derive_serialize(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as Input);
     let ident = input.ident;
+    let generics = input.generics;
     let num_fields = count_serialized_fields(&input.fields);
     let serialize_fields = serialize_fields(&input.fields, input.attrs.offset);
 
     TokenStream::from(quote! {
-        impl serde::Serialize for #ident {
+        impl #generics serde::Serialize for #ident #generics {
             fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
             where
                 S: serde::Serializer
