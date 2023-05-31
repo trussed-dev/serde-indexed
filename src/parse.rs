@@ -1,9 +1,10 @@
 use proc_macro2::Span;
 use syn::parse::{Error, Parse, ParseStream, Result};
-use syn::{Data, DeriveInput, Fields, Ident, Token};
+use syn::{Data, DeriveInput, Fields, Generics, Ident, Token};
 
 pub struct Input {
     pub ident: Ident,
+    pub generics: Generics,
     pub attrs: StructAttrs,
     pub fields: Vec<Field>,
 }
@@ -100,6 +101,7 @@ impl Parse for Input {
             ident: derive_input.ident,
             attrs,
             fields,
+            generics: derive_input.generics,
         })
     }
 }
