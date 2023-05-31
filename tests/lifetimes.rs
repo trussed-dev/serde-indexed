@@ -1,17 +1,20 @@
-use serde_indexed::SerializeIndexed;
-use utilities::cbor_serialize;
+use serde_indexed::{DeserializeIndexed, SerializeIndexed};
+use utilities::{cbor_deserialize_with_scratch, cbor_serialize};
 
-#[derive(SerializeIndexed)]
+extern crate alloc;
+use alloc::borrow::Cow;
+
+#[derive(PartialEq, Debug, SerializeIndexed, DeserializeIndexed)]
 #[serde_indexed(offset = 1)]
 struct WithLifetimes<'a> {
-    shared_data: &'a [u8],
-        #[serde(skip_serializing_if = "Option::is_none")]
-        option: Option<u8>,
+    data: Cow<'a, [u8]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    option: Option<u8>,
 }
 
 fn lifetime_example<'a>() -> WithLifetimes<'a> {
     WithLifetimes {
-        shared_data: &[1, 2, 3],
+        data: Cow::Borrowed(&[1, 2, 3]),
         option: None,
     }
 }
@@ -26,4 +29,17 @@ fn serialize() {
     let size = cbor_serialize(&data, &mut buf).unwrap();
 
     assert_eq!(&buf[..size], SERIALIZED_LIFETIME_EXAMPLE);
+}
+
+#[test]
+fn deserialize() {
+    let example = lifetime_example();
+
+    let deserialized: WithLifetimes<'_> =
+        cbor_deserialize_with_scratch(SERIALIZED_LIFETIME_EXAMPLE, &mut []).unwrap();
+
+    assert_eq!(deserialized, example);
+    let Cow::Owned(_) = deserialized.data else {
+        panic!("Expected deserialized data Cow::Owned");
+    };
 }

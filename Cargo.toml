@@ -20,6 +20,7 @@ syn = "1.0"
 
 [dev-dependencies]
 heapless = { version = "0.5.6", default-features = false, features = ["serde"] }
-serde = { version = "1", default-features = false }
+# "alloc" feature required to test serde traits on borrowed data (Cow)
+serde = { version = "1", default-features = false, features = ["alloc"] }
 serde_cbor = { version = "0.11.0", default-features = false }
 utilities = { path = "utilities" }

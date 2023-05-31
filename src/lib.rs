@@ -172,6 +172,14 @@ fn all_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStream> {
 pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as Input);
     let ident = input.ident;
+
+    let (ident_generics, _, _) = input.generics.split_for_impl();
+    let ident_lifetimes = input.generics.params.iter();
+
+    let mut generics = input.generics.clone();
+    generics.params.push(syn::parse_quote!('de));
+    let (impl_generics, _, _) = generics.split_for_impl();
+
     let none_fields = none_fields(&input.fields);
     let unwrap_expected_fields = unwrap_expected_fields(&input.fields);
     let match_fields = match_fields(&input.fields, input.attrs.offset);
@@ -197,21 +205,24 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(quote! {
-        impl<'de> serde::Deserialize<'de> for #ident {
+        impl #impl_generics serde::Deserialize<'de> for #ident #ident_generics {
             fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
             where
                 D: serde::Deserializer<'de>,
             {
-                struct IndexedVisitor;
+                #[derive(Default)]
+                struct IndexedVisitor #ident_generics (
+                    #(std::marker::PhantomData<& #ident_lifetimes ()>,)*
+                );
 
-                impl<'de> serde::de::Visitor<'de> for IndexedVisitor {
-                    type Value = #ident;
+                impl #impl_generics serde::de::Visitor<'de> for IndexedVisitor #ident_generics {
+                    type Value = #ident #ident_generics;
 
                     fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
                         formatter.write_str(stringify!(#ident))
                     }
 
-                    fn visit_map<V>(self, mut map: V) -> core::result::Result<#ident, V::Error>
+                    fn visit_map<V>(self, mut map: V) -> core::result::Result<#ident #ident_generics, V::Error>
                     where
                         V: serde::de::MapAccess<'de>,
                     {
@@ -225,7 +236,7 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
                     }
                 }
 
-                deserializer.deserialize_map(IndexedVisitor {})
+                deserializer.deserialize_map(IndexedVisitor::default())
             }
         }
     })
