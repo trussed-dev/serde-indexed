@@ -27,27 +27,24 @@ pub struct Field {
 fn parse_meta(attrs: &mut StructAttrs, meta: &syn::Meta) -> Result<()> {
     if let syn::Meta::List(value) = meta {
         for meta in &value.nested {
-            match meta {
-                syn::NestedMeta::Meta(syn::Meta::NameValue(name_value)) => {
-                    if name_value.path.is_ident("offset") {
-                        if let syn::Lit::Int(offset) = &name_value.lit {
-                            attrs.offset = offset.base10_parse()?;
-                            // println!("shall use offset {}", attrs.offset);
-                        }
+            if let syn::NestedMeta::Meta(syn::Meta::NameValue(name_value)) = meta {
+                if name_value.path.is_ident("offset") {
+                    if let syn::Lit::Int(offset) = &name_value.lit {
+                        attrs.offset = offset.base10_parse()?;
+                        // println!("shall use offset {}", attrs.offset);
                     }
                 }
-                // This `skip_nones` approach is tricky, as then we
-                // need to detect Option types, which means a lot of path
-                // manipulation, possibly in vain.
-                //
-                // syn::NestedMeta::Meta(syn::Meta::Path(path)) => {
-                //     if path.is_ident("skip_nones") {
-                //         // println!("shall skip nones");
-                //         attrs.skip_nones = true;
-                //     }
-                // },
-                _ => {}
             }
+            // This `skip_nones` approach is tricky, as then we
+            // need to detect Option types, which means a lot of path
+            // manipulation, possibly in vain.
+            //
+            // syn::NestedMeta::Meta(syn::Meta::Path(path)) => {
+            //     if path.is_ident("skip_nones") {
+            //         // println!("shall skip nones");
+            //         attrs.skip_nones = true;
+            //     }
+            // },
         }
     }
 
@@ -104,9 +101,7 @@ impl Parse for Input {
     }
 }
 
-fn fields_from_ast<'a>(
-    fields: &'a syn::punctuated::Punctuated<syn::Field, Token![,]>,
-) -> Vec<Field> {
+fn fields_from_ast(fields: &syn::punctuated::Punctuated<syn::Field, Token![,]>) -> Vec<Field> {
     // serde::internals::ast.rs:L183
     fields
         .iter()
@@ -135,23 +130,21 @@ fn fields_from_ast<'a>(
                     if attr.path.is_ident("serde") {
                         if let Ok(syn::Meta::List(value)) = attr.parse_meta() {
                             for meta in &value.nested {
-                                match meta {
-                                    syn::NestedMeta::Meta(syn::Meta::NameValue(name_value)) => {
-                                        if name_value.path.is_ident("skip_serializing_if") {
-                                            // println!("so close!");
-                                            if let syn::Lit::Str(litstr) = &name_value.lit {
-                                                let tokens =
-                                                    syn::parse_str(&litstr.value()).unwrap();
-                                                // println!("found something: {:?}", &litstr.value());
-                                                skip_serializing_if =
-                                                    Some(syn::parse2(tokens).unwrap());
-                                            }
-                                        } else {
-                                            // safety net, remove?
-                                            panic!("unknown field attribute");
+                                if let syn::NestedMeta::Meta(syn::Meta::NameValue(name_value)) =
+                                    meta
+                                {
+                                    if name_value.path.is_ident("skip_serializing_if") {
+                                        // println!("so close!");
+                                        if let syn::Lit::Str(litstr) = &name_value.lit {
+                                            let tokens = syn::parse_str(&litstr.value()).unwrap();
+                                            // println!("found something: {:?}", &litstr.value());
+                                            skip_serializing_if =
+                                                Some(syn::parse2(tokens).unwrap());
                                         }
+                                    } else {
+                                        // safety net, remove?
+                                        panic!("unknown field attribute");
                                     }
-                                    _ => {}
                                 }
                             }
                         }
