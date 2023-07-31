@@ -85,11 +85,11 @@ mod some_keys {
     }
 
     // in Python: cbor.dumps({1: -7, 2: [37]*7, 3: "so serde", 5: [42]*1})
-    const SERIALIZED_AN_EXAMPLE: &'static [u8] =
+    const SERIALIZED_AN_EXAMPLE: &[u8] =
         b"\xa4\x01&\x02\x87\x18%\x18%\x18%\x18%\x18%\x18%\x18%\x03hso serde\x05\x81\x18*";
 
     // in Python: cbor.dumps({1: -7, 2: [37]*7, 3: "so serde", 4: 0xff, 5: [42]*1})
-    const SERIALIZED_ANOTHER_EXAMPLE: &'static [u8] =
+    const SERIALIZED_ANOTHER_EXAMPLE: &[u8] =
         b"\xa5\x01&\x02\x87\x18%\x18%\x18%\x18%\x18%\x18%\x18%\x03hso serde\x04\x18\xff\x05\x81\x18*";
 
     #[test]

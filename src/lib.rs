@@ -176,7 +176,7 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     let match_fields = match_fields(&input.fields, input.attrs.offset);
     let all_fields = all_fields(&input.fields);
 
-    let the_loop = if input.fields.len() > 0 {
+    let the_loop = if !input.fields.is_empty() {
         // NB: In the previous "none_fields", we use the actual struct's
         // keys as variable names. If the struct happens to have a key
         // named "key", it would clash with __serde_indexed_internal_key,
