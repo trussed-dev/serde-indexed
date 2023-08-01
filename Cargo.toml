@@ -21,7 +21,7 @@ syn = "1.0"
 [dev-dependencies]
 heapless = { version = "0.7.16", default-features = false, features = ["serde"] }
 hex-literal = "0.4.1"
-serde = { version = "1", default-features = false }
+serde = { version = "1" }
 serde-byte-array = "0.1.2"
 serde_bytes = { version = "0.11.12", default-features = false }
-serde_cbor = { version = "0.11.0", default-features = false }
+serde_cbor = { version = "0.11.0" }
