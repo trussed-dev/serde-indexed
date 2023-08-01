@@ -1,6 +1,7 @@
 use proc_macro2::Span;
+use syn::meta::ParseNestedMeta;
 use syn::parse::{Error, Parse, ParseStream, Result};
-use syn::{Data, DeriveInput, Fields, Ident, Lifetime, Token};
+use syn::{Data, DeriveInput, Fields, Ident, Lifetime, LitInt, LitStr, Token};
 
 pub struct Input {
     pub ident: Ident,
@@ -25,44 +26,31 @@ pub struct Field {
     pub original: syn::Field,
 }
 
-fn parse_meta(attrs: &mut StructAttrs, meta: &syn::Meta) -> Result<()> {
-    if let syn::Meta::List(value) = meta {
-        for meta in &value.nested {
-            if let syn::NestedMeta::Meta(syn::Meta::NameValue(name_value)) = meta {
-                if name_value.path.is_ident("offset") {
-                    if let syn::Lit::Int(offset) = &name_value.lit {
-                        attrs.offset = offset.base10_parse()?;
-                        // println!("shall use offset {}", attrs.offset);
-                    }
-                }
-            }
-            // This `skip_nones` approach is tricky, as then we
-            // need to detect Option types, which means a lot of path
-            // manipulation, possibly in vain.
-            //
-            // syn::NestedMeta::Meta(syn::Meta::Path(path)) => {
-            //     if path.is_ident("skip_nones") {
-            //         // println!("shall skip nones");
-            //         attrs.skip_nones = true;
-            //     }
-            // },
-        }
+fn parse_meta(attrs: &mut StructAttrs, meta: ParseNestedMeta) -> Result<()> {
+    if meta.path.is_ident("offset") {
+        let value = meta.value()?;
+        let offset: LitInt = value.parse()?;
+        attrs.offset = offset.base10_parse()?;
+        Ok(())
+    } else {
+        Err(meta.error(format_args!(
+            "the only accepted struct level attribute is offset"
+        )))
     }
-
-    Ok(())
 }
 
 fn parse_attrs(attrs: &Vec<syn::Attribute>) -> Result<StructAttrs> {
     let mut struct_attrs: StructAttrs = Default::default();
 
     for attr in attrs {
-        if attr.path.is_ident("serde_indexed") {
+        if attr.path().is_ident("serde_indexed") {
+            attr.parse_nested_meta(|meta| parse_meta(&mut struct_attrs, meta))?;
             // println!("parsing serde_indexed");
-            parse_meta(&mut struct_attrs, &attr.parse_meta()?)?;
+            // parse_meta(&mut struct_attrs, &attr.parse_meta()?)?;
         }
-        if attr.path.is_ident("serde") {
+        if attr.path().is_ident("serde") {
             // println!("parsing serde");
-            parse_meta(&mut struct_attrs, &attr.parse_meta()?)?;
+            attr.parse_nested_meta(|meta| parse_meta(&mut struct_attrs, meta))?;
         }
     }
 
@@ -70,11 +58,7 @@ fn parse_attrs(attrs: &Vec<syn::Attribute>) -> Result<StructAttrs> {
 }
 
 fn lifetimes(generics: &syn::Generics) -> Vec<Lifetime> {
-    generics
-        .lifetimes()
-        .into_iter()
-        .map(|l| l.lifetime.clone())
-        .collect()
+    generics.lifetimes().map(|l| l.lifetime.clone()).collect()
 }
 
 impl Parse for Input {
@@ -139,27 +123,26 @@ fn fields_from_ast(fields: &syn::punctuated::Punctuated<syn::Field, Token![,]>) 
             skip_serializing_if: {
                 let mut skip_serializing_if = None;
                 for attr in &field.attrs {
-                    if attr.path.is_ident("serde") {
-                        if let Ok(syn::Meta::List(value)) = attr.parse_meta() {
-                            for meta in &value.nested {
-                                if let syn::NestedMeta::Meta(syn::Meta::NameValue(name_value)) =
-                                    meta
-                                {
-                                    if name_value.path.is_ident("skip_serializing_if") {
-                                        // println!("so close!");
-                                        if let syn::Lit::Str(litstr) = &name_value.lit {
-                                            let tokens = syn::parse_str(&litstr.value()).unwrap();
-                                            // println!("found something: {:?}", &litstr.value());
-                                            skip_serializing_if =
-                                                Some(syn::parse2(tokens).unwrap());
-                                        }
-                                    } else {
-                                        // safety net, remove?
-                                        panic!("unknown field attribute");
-                                    }
+                    if attr.path().is_ident("serde") {
+                        attr.parse_nested_meta(|meta| {
+                            if meta.path.is_ident("skip_serializing_if") {
+                                let litstr: LitStr = meta
+                                    .value()
+                                    .expect(r#"skip_serializing_if = "literal""#)
+                                    .parse()
+                                    .expect(r#"skip_serializing_if = "literal""#);
+                                let tokens = syn::parse_str(&litstr.value())
+                                    .expect("Failed to parse attribute");
+                                if skip_serializing_if.is_some() {
+                                    panic!("Multiple attributes for skip_serializing_if");
                                 }
+                                skip_serializing_if = Some(syn::parse2(tokens).unwrap());
+                                Ok(())
+                            } else {
+                                panic!("Unkown field attribute")
                             }
-                        }
+                        })
+                        .expect("Failed to parse attribute");
                     }
                 }
                 skip_serializing_if
