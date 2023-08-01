@@ -38,6 +38,8 @@ mod some_keys {
     use super::*;
 
     use hex_literal::hex;
+    use serde_byte_array::ByteArray;
+    use serde_bytes::Bytes;
 
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
     #[serde_indexed(offset = 1)]
@@ -51,9 +53,28 @@ mod some_keys {
     }
 
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
+    #[serde_indexed(offset = 1)]
+    pub struct SomeRefKeys<'a> {
+        pub number: i32,
+        pub bytes: &'a ByteArray<7>,
+        pub string: &'a str,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub option: Option<u8>,
+        pub vector: &'a Bytes,
+    }
+
+    #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
     // #[serde_indexed(offset = 1)]
     pub struct NakedOption {
         pub option: Option<SomeKeys>,
+        pub num: usize,
+        pub key: bool,
+    }
+
+    #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
+    // #[serde_indexed(offset = 1)]
+    pub struct NakedRefOption<'a> {
+        pub option: Option<SomeRefKeys<'a>>,
         pub num: usize,
         pub key: bool,
     }
@@ -76,18 +97,40 @@ mod some_keys {
             option: None,
             vector,
         };
-        // in Python: cbor.dumps({1: -7, 2: [37]*7, 3: "so serde", 5: [42]*1})
+        // in Python: cbor2.dumps({1: -7, 2: [37]*7, 3: "so serde", 5: [42]*1})
         let serialized: &[u8] =
             &hex!("a40126028718251825182518251825182518250368736f2073657264650581182a");
+        (serialized, value)
+    }
+
+    fn a_ref_example() -> (&'static [u8], SomeRefKeys<'static>) {
+        const BYTE_ARRAY: ByteArray<7> = ByteArray::new([37u8; 7]);
+        let value = SomeRefKeys {
+            number: -7,
+            bytes: &BYTE_ARRAY,
+            string: "so serde",
+            option: None,
+            vector: Bytes::new(&[42]),
+        };
+        // in Python: cbor2.dumps({1: -7, 2: bytes([37]*7), 3: "so serde", 5: bytes([42]*1)}).
+        let serialized: &[u8] = &hex!("a401260247252525252525250368736f20736572646505412a");
         (serialized, value)
     }
 
     fn another_example() -> (&'static [u8], SomeKeys) {
         let (_, mut an_example) = an_example();
         an_example.option = Some(0xff);
-        // in Python: cbor.dumps({1: -7, 2: [37]*7, 3: "so serde", 4: 0xff, 5: [42]*1})
+        // in Python: cbor2.dumps({1: -7, 2: [37]*7, 3: "so serde", 4: 0xff, 5: [42]*1})
         let serialized: &[u8] =
             &hex!("a50126028718251825182518251825182518250368736f2073657264650418ff0581182a");
+        (serialized, an_example)
+    }
+
+    fn another_ref_example() -> (&'static [u8], SomeRefKeys<'static>) {
+        let (_, mut an_example) = a_ref_example();
+        an_example.option = Some(0xff);
+        // in Python: cbor2.dumps({1: -7, 2: bytes([37]*7), 3: "so serde", 4: 0xff,  5: bytes([42]*1)}).hex()
+        let serialized: &[u8] = &hex!("a501260247252525252525250368736f2073657264650418ff05412a");
         (serialized, an_example)
     }
 
@@ -113,6 +156,27 @@ mod some_keys {
     }
 
     #[test]
+    fn serialize_ref() {
+        let (serialized_value, example) = a_ref_example();
+
+        let mut buffer = [0u8; 64];
+        let size = cbor_serialize(&example, &mut buffer).unwrap();
+
+        assert_eq!(&buffer[..size], serialized_value);
+    }
+
+    #[test]
+    fn deserialize_ref() {
+        let (serialized_value, example) = a_ref_example();
+
+        // no allocations need in this case.
+        let maybe_example: SomeRefKeys =
+            cbor_deserialize_with_scratch(serialized_value, &mut []).unwrap();
+
+        assert_eq!(maybe_example, example);
+    }
+
+    #[test]
     fn another_serialize() {
         let (serialized_value, example) = another_example();
 
@@ -130,6 +194,28 @@ mod some_keys {
         let mut buffer = serialized_value.to_owned();
 
         let maybe_example: SomeKeys = cbor_deserialize(&mut buffer).unwrap();
+
+        assert_eq!(maybe_example, example);
+    }
+
+    #[test]
+    fn another_ref_serialize() {
+        let (serialized_value, example) = another_ref_example();
+
+        let mut buffer = [0u8; 64];
+        let size = cbor_serialize(&example, &mut buffer).unwrap();
+
+        assert_eq!(&buffer[..size], serialized_value);
+    }
+
+    #[test]
+    fn another_ref_deserialize() {
+        let (serialized_value, example) = another_ref_example();
+        // could also use `cbor_deserialize_with_scratch` in this case,
+        // demonstrating the `cbor_deserialize` function.
+        let mut buffer = serialized_value.to_owned();
+
+        let maybe_example: SomeRefKeys = cbor_deserialize(&mut buffer).unwrap();
 
         assert_eq!(maybe_example, example);
     }
