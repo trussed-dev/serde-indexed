@@ -54,13 +54,13 @@ mod some_keys {
 
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
     #[serde_indexed(offset = 1)]
-    pub struct SomeRefKeys<'a> {
+    pub struct SomeRefKeys<'a, 'b, 'c> {
         pub number: i32,
         pub bytes: &'a ByteArray<7>,
-        pub string: &'a str,
+        pub string: &'b str,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub option: Option<u8>,
-        pub vector: &'a Bytes,
+        pub vector: &'c Bytes,
     }
 
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
@@ -73,8 +73,8 @@ mod some_keys {
 
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
     // #[serde_indexed(offset = 1)]
-    pub struct NakedRefOption<'a> {
-        pub option: Option<SomeRefKeys<'a>>,
+    pub struct NakedRefOption<'a, 'b, 'c> {
+        pub option: Option<SomeRefKeys<'a, 'b, 'c>>,
         pub num: usize,
         pub key: bool,
     }
@@ -103,7 +103,7 @@ mod some_keys {
         (serialized, value)
     }
 
-    fn a_ref_example() -> (&'static [u8], SomeRefKeys<'static>) {
+    fn a_ref_example() -> (&'static [u8], SomeRefKeys<'static, 'static, 'static>) {
         const BYTE_ARRAY: ByteArray<7> = ByteArray::new([37u8; 7]);
         let value = SomeRefKeys {
             number: -7,
@@ -126,7 +126,7 @@ mod some_keys {
         (serialized, an_example)
     }
 
-    fn another_ref_example() -> (&'static [u8], SomeRefKeys<'static>) {
+    fn another_ref_example() -> (&'static [u8], SomeRefKeys<'static, 'static, 'static>) {
         let (_, mut an_example) = a_ref_example();
         an_example.option = Some(0xff);
         // in Python: cbor2.dumps({1: -7, 2: bytes([37]*7), 3: "so serde", 4: 0xff,  5: bytes([42]*1)}).hex()
