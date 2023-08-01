@@ -82,7 +82,7 @@ impl Parse for Input {
             }
         };
 
-        let fields = fields_from_ast(&syn_fields.named);
+        let fields = fields_from_ast(&syn_fields.named)?;
 
         let lifetimes = lifetimes(&derive_input.generics);
 
@@ -97,58 +97,55 @@ impl Parse for Input {
     }
 }
 
-fn fields_from_ast(fields: &syn::punctuated::Punctuated<syn::Field, Token![,]>) -> Vec<Field> {
+fn fields_from_ast(
+    fields: &syn::punctuated::Punctuated<syn::Field, Token![,]>,
+) -> Result<Vec<Field>> {
     // serde::internals::ast.rs:L183
     fields
         .iter()
         .enumerate()
-        .map(|(i, field)| Field {
-            // these are https://docs.rs/syn/1.0.13/syn/struct.Field.html
-            label: match &field.ident {
-                Some(ident) => ident.to_string(),
-                None => {
-                    // TODO: does this happen?
-                    panic!("input struct must have named fields");
-                }
-            },
-            member: match &field.ident {
-                Some(ident) => syn::Member::Named(ident.clone()),
-                None => {
-                    // TODO: does this happen?
-                    panic!("input struct must have named fields");
-                }
-            },
-            index: i,
-            // TODO: make this... more concise? handle errors? the thing with the spans?
-            skip_serializing_if: {
-                let mut skip_serializing_if = None;
-                for attr in &field.attrs {
-                    if attr.path().is_ident("serde") {
-                        attr.parse_nested_meta(|meta| {
-                            if meta.path.is_ident("skip_serializing_if") {
-                                let litstr: LitStr = meta
-                                    .value()
-                                    .expect(r#"skip_serializing_if = "literal""#)
-                                    .parse()
-                                    .expect(r#"skip_serializing_if = "literal""#);
-                                let tokens = syn::parse_str(&litstr.value())
-                                    .expect("Failed to parse attribute");
-                                if skip_serializing_if.is_some() {
-                                    panic!("Multiple attributes for skip_serializing_if");
-                                }
-                                skip_serializing_if = Some(syn::parse2(tokens).unwrap());
-                                Ok(())
-                            } else {
-                                panic!("Unkown field attribute")
-                            }
-                        })
-                        .expect("Failed to parse attribute");
+        .map(|(i, field)| {
+            Ok(Field {
+                // these are https://docs.rs/syn/2.0.28/syn/struct.Field.html
+                label: match &field.ident {
+                    Some(ident) => ident.to_string(),
+                    None => {
+                        return Err(Error::new_spanned(fields, "Tuple struct are not supported"));
                     }
-                }
-                skip_serializing_if
-            },
-            ty: field.ty.clone(),
-            original: field.clone(),
+                },
+                member: match &field.ident {
+                    Some(ident) => syn::Member::Named(ident.clone()),
+                    None => {
+                        return Err(Error::new_spanned(fields, "Tuple struct are not supported"));
+                    }
+                },
+                index: i,
+                // TODO: make this... more concise? handle errors? the thing with the spans?
+                skip_serializing_if: {
+                    let mut skip_serializing_if = None;
+                    for attr in &field.attrs {
+                        if attr.path().is_ident("serde") {
+                            attr.parse_nested_meta(|meta| {
+                                if meta.path.is_ident("skip_serializing_if") {
+                                    let litstr: LitStr = meta.value()?.parse()?;
+                                    let tokens = syn::parse_str(&litstr.value())?;
+                                    if skip_serializing_if.is_some() {
+                                        return Err(meta
+                                            .error("Multiple attributes for skip_serializing_if"));
+                                    }
+                                    skip_serializing_if = Some(syn::parse2(tokens)?);
+                                    Ok(())
+                                } else {
+                                    Err(meta.error("Unkown field attribute"))
+                                }
+                            })?;
+                        }
+                    }
+                    skip_serializing_if
+                },
+                ty: field.ty.clone(),
+                original: field.clone(),
+            })
         })
         .collect()
 }
