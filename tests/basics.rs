@@ -37,6 +37,8 @@ fn cbor_deserialize_with_scratch<'de, T: serde::Deserialize<'de>>(
 mod some_keys {
     use super::*;
 
+    use hex_literal::hex;
+
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
     #[serde_indexed(offset = 1)]
     pub struct SomeKeys {
@@ -47,6 +49,7 @@ mod some_keys {
         pub option: Option<u8>,
         pub vector: heapless::Vec<u8, 16>,
     }
+
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
     // #[serde_indexed(offset = 1)]
     pub struct NakedOption {
@@ -59,74 +62,75 @@ mod some_keys {
     // #[serde_indexed(offset = 1)]
     pub struct EmptyStruct {}
 
-    fn an_example() -> SomeKeys {
+    fn an_example() -> (&'static [u8], SomeKeys) {
         let mut string = heapless::String::new();
         string.push_str("so serde").unwrap();
 
         let mut vector = heapless::Vec::<u8, 16>::new();
         vector.push(42).unwrap();
 
-        SomeKeys {
+        let value = SomeKeys {
             number: -7,
             bytes: [37u8; 7],
             string,
             option: None,
             vector,
-        }
+        };
+        // in Python: cbor.dumps({1: -7, 2: [37]*7, 3: "so serde", 5: [42]*1})
+        let serialized: &[u8] =
+            &hex!("a40126028718251825182518251825182518250368736f2073657264650581182a");
+        (serialized, value)
     }
 
-    fn another_example() -> SomeKeys {
-        let mut an_example = an_example();
+    fn another_example() -> (&'static [u8], SomeKeys) {
+        let (_, mut an_example) = an_example();
         an_example.option = Some(0xff);
-        an_example
+        // in Python: cbor.dumps({1: -7, 2: [37]*7, 3: "so serde", 4: 0xff, 5: [42]*1})
+        let serialized: &[u8] =
+            &hex!("a50126028718251825182518251825182518250368736f2073657264650418ff0581182a");
+        (serialized, an_example)
     }
-
-    // in Python: cbor.dumps({1: -7, 2: [37]*7, 3: "so serde", 5: [42]*1})
-    const SERIALIZED_AN_EXAMPLE: &[u8] =
-        b"\xa4\x01&\x02\x87\x18%\x18%\x18%\x18%\x18%\x18%\x18%\x03hso serde\x05\x81\x18*";
-
-    // in Python: cbor.dumps({1: -7, 2: [37]*7, 3: "so serde", 4: 0xff, 5: [42]*1})
-    const SERIALIZED_ANOTHER_EXAMPLE: &[u8] =
-        b"\xa5\x01&\x02\x87\x18%\x18%\x18%\x18%\x18%\x18%\x18%\x03hso serde\x04\x18\xff\x05\x81\x18*";
 
     #[test]
     fn serialize() {
-        let example = an_example();
+        let (serialized_value, example) = an_example();
 
         let mut buffer = [0u8; 64];
         let size = cbor_serialize(&example, &mut buffer).unwrap();
 
-        assert_eq!(&buffer[..size], SERIALIZED_AN_EXAMPLE);
+        assert_eq!(&buffer[..size], serialized_value);
     }
 
     #[test]
     fn deserialize() {
+        let (serialized_value, example) = an_example();
+
         // no allocations need in this case.
         let maybe_example: SomeKeys =
-            cbor_deserialize_with_scratch(SERIALIZED_AN_EXAMPLE, &mut []).unwrap();
+            cbor_deserialize_with_scratch(serialized_value, &mut []).unwrap();
 
-        assert_eq!(maybe_example, an_example());
+        assert_eq!(maybe_example, example);
     }
 
     #[test]
     fn another_serialize() {
-        let example = another_example();
+        let (serialized_value, example) = another_example();
 
         let mut buffer = [0u8; 64];
         let size = cbor_serialize(&example, &mut buffer).unwrap();
 
-        assert_eq!(&buffer[..size], SERIALIZED_ANOTHER_EXAMPLE);
+        assert_eq!(&buffer[..size], serialized_value);
     }
 
     #[test]
     fn another_deserialize() {
+        let (serialized_value, example) = another_example();
         // could also use `cbor_deserialize_with_scratch` in this case,
         // demonstrating the `cbor_deserialize` function.
-        let mut buffer = [0u8; SERIALIZED_ANOTHER_EXAMPLE.len()];
-        buffer[..SERIALIZED_ANOTHER_EXAMPLE.len()].copy_from_slice(SERIALIZED_ANOTHER_EXAMPLE);
+        let mut buffer = serialized_value.to_owned();
 
         let maybe_example: SomeKeys = cbor_deserialize(&mut buffer).unwrap();
 
-        assert_eq!(maybe_example, another_example());
+        assert_eq!(maybe_example, example);
     }
 }
