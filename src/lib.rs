@@ -30,6 +30,8 @@ extern crate proc_macro;
 
 mod parse;
 
+use std::iter;
+
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::parse_macro_input;
@@ -85,9 +87,10 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
     let ident = input.ident;
     let num_fields = count_serialized_fields(&input.fields);
     let serialize_fields = serialize_fields(&input.fields, input.attrs.offset);
+    let (_, lifetimes) = lifetimes(&input.lifetimes);
 
     TokenStream::from(quote! {
-        impl serde::Serialize for #ident {
+        impl<#(#lifetimes),*> serde::Serialize for #ident<#(#lifetimes),*> {
             fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
             where
                 S: serde::Serializer
@@ -167,6 +170,21 @@ fn all_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStream> {
         .collect()
 }
 
+fn lifetimes(
+    lifetimes: &[syn::Lifetime],
+) -> (proc_macro2::TokenStream, Vec<proc_macro2::TokenStream>) {
+    let lifetimes: Vec<_> = lifetimes
+        .into_iter()
+        .map(|l| {
+            quote! {#l}
+        })
+        .collect();
+    let de_lifetime = quote! {
+        'de: #(#lifetimes)+*
+    };
+    (de_lifetime, lifetimes)
+}
+
 #[proc_macro_derive(DeserializeIndexed, attributes(serde, serde_indexed))]
 pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as Input);
@@ -175,6 +193,9 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     let unwrap_expected_fields = unwrap_expected_fields(&input.fields);
     let match_fields = match_fields(&input.fields, input.attrs.offset);
     let all_fields = all_fields(&input.fields);
+    let (de_lifetime, lifetimes) = lifetimes(&input.lifetimes);
+    let impl_lifetimes = iter::once(&de_lifetime).chain(&lifetimes);
+    let impl_lifetimes2 = impl_lifetimes.clone();
 
     let the_loop = if !input.fields.is_empty() {
         // NB: In the previous "none_fields", we use the actual struct's
@@ -195,22 +216,29 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
         quote! {}
     };
 
+    let phantom_datas_ty = lifetimes
+        .iter()
+        .map(|l| quote!(core::marker::PhantomData<&#l ()>));
+    let phantom_datas_values = lifetimes
+        .iter()
+        .map(|_l| quote!(core::marker::PhantomData::default()));
+
     TokenStream::from(quote! {
-        impl<'de> serde::Deserialize<'de> for #ident {
+        impl<#(#impl_lifetimes),*> serde::Deserialize<'de> for #ident<#(#lifetimes),*> {
             fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
             where
                 D: serde::Deserializer<'de>,
             {
-                struct IndexedVisitor;
+                struct IndexedVisitor<#(#lifetimes),*>(#(#phantom_datas_ty),*);
 
-                impl<'de> serde::de::Visitor<'de> for IndexedVisitor {
-                    type Value = #ident;
+                impl<#(#impl_lifetimes2),*> serde::de::Visitor<'de> for IndexedVisitor<#(#lifetimes),*> {
+                    type Value = #ident<#(#lifetimes),*>;
 
                     fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
                         formatter.write_str(stringify!(#ident))
                     }
 
-                    fn visit_map<V>(self, mut map: V) -> core::result::Result<#ident, V::Error>
+                    fn visit_map<V>(self, mut map: V) -> core::result::Result<Self::Value, V::Error>
                     where
                         V: serde::de::MapAccess<'de>,
                     {
@@ -224,7 +252,7 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
                     }
                 }
 
-                deserializer.deserialize_map(IndexedVisitor {})
+                deserializer.deserialize_map(IndexedVisitor(#(#phantom_datas_values),*))
             }
         }
     })

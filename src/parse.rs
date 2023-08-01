@@ -1,11 +1,12 @@
 use proc_macro2::Span;
 use syn::parse::{Error, Parse, ParseStream, Result};
-use syn::{Data, DeriveInput, Fields, Ident, Token};
+use syn::{Data, DeriveInput, Fields, Ident, Lifetime, Token};
 
 pub struct Input {
     pub ident: Ident,
     pub attrs: StructAttrs,
     pub fields: Vec<Field>,
+    pub lifetimes: Vec<Lifetime>,
 }
 
 #[derive(Default)]
@@ -68,6 +69,14 @@ fn parse_attrs(attrs: &Vec<syn::Attribute>) -> Result<StructAttrs> {
     Ok(struct_attrs)
 }
 
+fn lifetimes(generics: &syn::Generics) -> Vec<Lifetime> {
+    generics
+        .lifetimes()
+        .into_iter()
+        .map(|l| l.lifetime.clone())
+        .collect()
+}
+
 impl Parse for Input {
     fn parse(input: ParseStream) -> Result<Self> {
         let call_site = Span::call_site();
@@ -91,12 +100,15 @@ impl Parse for Input {
 
         let fields = fields_from_ast(&syn_fields.named);
 
+        let lifetimes = lifetimes(&derive_input.generics);
+
         //serde::internals::ast calls `fields_from_ast(cx, &fields.named, attrs, container_default)`
 
         Ok(Input {
             ident: derive_input.ident,
             attrs,
             fields,
+            lifetimes,
         })
     }
 }
