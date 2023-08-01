@@ -37,19 +37,16 @@ fn cbor_deserialize_with_scratch<'de, T: serde::Deserialize<'de>>(
 mod some_keys {
     use super::*;
 
-    use heapless::consts;
-
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
     #[serde_indexed(offset = 1)]
     pub struct SomeKeys {
         pub number: i32,
         pub bytes: [u8; 7],
-        pub string: heapless::String<consts::U10>,
+        pub string: heapless::String<10>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub option: Option<u8>,
-        pub vector: heapless::Vec<u8, consts::U16>,
+        pub vector: heapless::Vec<u8, 16>,
     }
-
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
     // #[serde_indexed(offset = 1)]
     pub struct NakedOption {
@@ -66,7 +63,7 @@ mod some_keys {
         let mut string = heapless::String::new();
         string.push_str("so serde").unwrap();
 
-        let mut vector = heapless::Vec::<u8, consts::U16>::new();
+        let mut vector = heapless::Vec::<u8, 16>::new();
         vector.push(42).unwrap();
 
         SomeKeys {
