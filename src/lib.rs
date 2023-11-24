@@ -32,7 +32,7 @@ mod parse;
 
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::parse_macro_input;
+use syn::{parse_macro_input, Lifetime, LifetimeParam};
 
 use crate::parse::Input;
 
@@ -85,10 +85,11 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
     let ident = input.ident;
     let num_fields = count_serialized_fields(&input.fields);
     let serialize_fields = serialize_fields(&input.fields, input.attrs.offset);
-    let lifetimes = &input.lifetimes;
+    let lifetimes_imp = input.generics.lifetimes();
+    let lifetimes_ty = input.generics.lifetimes();
 
     TokenStream::from(quote! {
-        impl<#(#lifetimes),*> serde::Serialize for #ident<#(#lifetimes),*> {
+        impl<#(#lifetimes_imp),*> serde::Serialize for #ident<#(#lifetimes_ty),*> {
             fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
             where
                 S: serde::Serializer
@@ -168,7 +169,8 @@ fn all_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStream> {
         .collect()
 }
 
-fn de_lifetime(lifetimes: &[syn::Lifetime]) -> proc_macro2::TokenStream {
+fn de_lifetime<'a>(lifetimes: impl Iterator<Item = &'a LifetimeParam>) -> proc_macro2::TokenStream {
+    let lifetimes = lifetimes.map(|l| &l.lifetime);
     quote! {
         'de: #(#lifetimes)+*
     }
@@ -182,8 +184,9 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     let unwrap_expected_fields = unwrap_expected_fields(&input.fields);
     let match_fields = match_fields(&input.fields, input.attrs.offset);
     let all_fields = all_fields(&input.fields);
-    let de_lifetime = de_lifetime(&input.lifetimes);
-    let lifetimes = input.lifetimes;
+    let de_lifetime = de_lifetime(input.generics.lifetimes());
+    let lifetimes: Vec<_> = input.generics.lifetimes().collect();
+    let lifetimes = &*lifetimes;
 
     let the_loop = if !input.fields.is_empty() {
         // NB: In the previous "none_fields", we use the actual struct's
