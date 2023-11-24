@@ -265,3 +265,114 @@ mod cow {
         };
     }
 }
+
+mod generics {
+    use super::*;
+    use heapless::String;
+    use serde_byte_array::ByteArray;
+    use serde_bytes::Bytes;
+
+    const SERIALIZED_GENERIC_EXAMPLE: &'static [u8] = b"\xa1\x01\x43\x01\x02\x03";
+
+    #[derive(PartialEq, Debug, SerializeIndexed, DeserializeIndexed)]
+    #[serde_indexed(offset = 1)]
+    struct WithGeneric<T> {
+        data: T,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        option: Option<u8>,
+    }
+
+    fn generics_example<'a>() -> WithGeneric<&'a Bytes> {
+        WithGeneric {
+            data: Bytes::new(&[1, 2, 3]),
+            option: None,
+        }
+    }
+
+    #[derive(PartialEq, Debug, SerializeIndexed, DeserializeIndexed)]
+    #[serde_indexed(offset = 1)]
+    struct WithConstGeneric<const N: usize> {
+        data: ByteArray<N>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        option: Option<u8>,
+    }
+
+    fn const_generics_example<'a>() -> WithConstGeneric<3> {
+        WithConstGeneric {
+            data: ByteArray::new([1, 2, 3]),
+            option: None,
+        }
+    }
+
+    #[test]
+    fn serialize() {
+        let data = generics_example();
+        let mut buf = [0u8; 64];
+        let size = cbor_serialize(&data, &mut buf).unwrap();
+
+        assert_eq!(&buf[..size], SERIALIZED_GENERIC_EXAMPLE);
+
+        let data = const_generics_example();
+        let mut buf = [0u8; 64];
+        let size = cbor_serialize(&data, &mut buf).unwrap();
+
+        assert_eq!(&buf[..size], SERIALIZED_GENERIC_EXAMPLE);
+    }
+
+    #[test]
+    fn deserialize() {
+        let example = generics_example();
+
+        let deserialized: WithGeneric<&'_ Bytes> =
+            cbor_deserialize_with_scratch(SERIALIZED_GENERIC_EXAMPLE, &mut []).unwrap();
+
+        assert_eq!(deserialized, example);
+
+        let example = const_generics_example();
+
+        let deserialized: WithConstGeneric<3> =
+            cbor_deserialize_with_scratch(SERIALIZED_GENERIC_EXAMPLE, &mut []).unwrap();
+
+        assert_eq!(deserialized, example);
+    }
+
+    #[derive(PartialEq, Debug, SerializeIndexed, DeserializeIndexed)]
+    #[serde_indexed(offset = 1)]
+    struct WithAllGenerics<'a, 'b, T, I, const N: usize, const Z: usize> {
+        data1: heapless::Vec<T, N>,
+        data2: heapless::Vec<I, Z>,
+        data3: &'a Bytes,
+        data4: &'b ByteArray<Z>,
+    }
+
+    fn all_generics_example<'a, 'b>() -> WithAllGenerics<'a, 'b, String<5>, u8, 10, 3> {
+        let data1 = heapless::Vec::from_slice(&["abc".into(), "acdef".into()]).unwrap();
+        let data2 = heapless::Vec::from_slice(&[1, 2]).unwrap();
+
+        const BYTES: ByteArray<3> = ByteArray::new(*b"123");
+        WithAllGenerics {
+            data1,
+            data2,
+            data3: Bytes::new(b"bytes"),
+            data4: &BYTES,
+        }
+    }
+
+    #[test]
+    fn all_generics() {
+        const SERIALIZED_ALL_GENERIC_EXAMPLE: &'static [u8] = b"\xa4\x01\x82\x63\x61\x62\x63\x65\x61\x63\x64\x65\x66\x02\x82\x01\x02\x03\x45\x62\x79\x74\x65\x73\x04\x43\x31\x32\x33";
+        let data = all_generics_example();
+        let mut buf = [0u8; 64];
+        let size = cbor_serialize(&data, &mut buf).unwrap();
+
+        println!("{buf:02x?}");
+        assert_eq!(&buf[..size], SERIALIZED_ALL_GENERIC_EXAMPLE);
+
+        let example = all_generics_example();
+
+        let deserialized: WithAllGenerics<'_, '_, String<5>, u8, 10, 3> =
+            cbor_deserialize_with_scratch(SERIALIZED_ALL_GENERIC_EXAMPLE, &mut []).unwrap();
+
+        assert_eq!(deserialized, example);
+    }
+}

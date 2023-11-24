@@ -31,8 +31,9 @@ extern crate proc_macro;
 mod parse;
 
 use proc_macro::TokenStream;
+use proc_macro2::{Ident, Span};
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Lifetime, LifetimeParam};
+use syn::{parse_macro_input, Lifetime, LifetimeParam, TypeParamBound};
 
 use crate::parse::Input;
 
@@ -85,11 +86,17 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
     let ident = input.ident;
     let num_fields = count_serialized_fields(&input.fields);
     let serialize_fields = serialize_fields(&input.fields, input.attrs.offset);
-    let lifetimes_imp = input.generics.lifetimes();
-    let lifetimes_ty = input.generics.lifetimes();
+    let (_, ty_generics, where_clause) = input.generics.split_for_impl();
+    let mut generics_cl = input.generics.clone();
+    generics_cl.type_params_mut().for_each(|t| {
+        t.bounds
+            .push_value(TypeParamBound::Verbatim(quote!(serde::Serialize)));
+    });
+    let (impl_generics, _, _) = generics_cl.split_for_impl();
 
     TokenStream::from(quote! {
-        impl<#(#lifetimes_imp),*> serde::Serialize for #ident<#(#lifetimes_ty),*> {
+        #[automatically_derived]
+        impl #impl_generics serde::Serialize for #ident #ty_generics #where_clause  {
             fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
             where
                 S: serde::Serializer
@@ -169,13 +176,6 @@ fn all_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStream> {
         .collect()
 }
 
-fn de_lifetime<'a>(lifetimes: impl Iterator<Item = &'a LifetimeParam>) -> proc_macro2::TokenStream {
-    let lifetimes = lifetimes.map(|l| &l.lifetime);
-    quote! {
-        'de: #(#lifetimes)+*
-    }
-}
-
 #[proc_macro_derive(DeserializeIndexed, attributes(serde, serde_indexed))]
 pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as Input);
@@ -184,9 +184,32 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     let unwrap_expected_fields = unwrap_expected_fields(&input.fields);
     let match_fields = match_fields(&input.fields, input.attrs.offset);
     let all_fields = all_fields(&input.fields);
-    let de_lifetime = de_lifetime(input.generics.lifetimes());
-    let lifetimes: Vec<_> = input.generics.lifetimes().collect();
-    let lifetimes = &*lifetimes;
+
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+
+    let mut generics_cl = input.generics.clone();
+    generics_cl.params.insert(
+        0,
+        syn::GenericParam::Lifetime(LifetimeParam {
+            attrs: Vec::new(),
+            lifetime: Lifetime {
+                apostrophe: Span::call_site(),
+                ident: Ident::new("de", Span::call_site()),
+            },
+            colon_token: None,
+            bounds: input
+                .generics
+                .lifetimes()
+                .map(|l| l.lifetime.clone())
+                .collect(),
+        }),
+    );
+    generics_cl.type_params_mut().for_each(|t| {
+        t.bounds
+            .push_value(TypeParamBound::Verbatim(quote!(serde::Deserialize<'de>)));
+    });
+
+    let (impl_generics_with_de, _, _) = generics_cl.split_for_impl();
 
     let the_loop = if !input.fields.is_empty() {
         // NB: In the previous "none_fields", we use the actual struct's
@@ -207,16 +230,17 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
         quote! {}
     };
 
-    TokenStream::from(quote! {
-        impl<#de_lifetime, #(#lifetimes),*> serde::Deserialize<'de> for #ident<#(#lifetimes),*> {
+    let res = quote! {
+        #[automatically_derived]
+        impl #impl_generics_with_de serde::Deserialize<'de> for #ident #ty_generics #where_clause {
             fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
             where
                 D: serde::Deserializer<'de>,
             {
-                struct IndexedVisitor<#(#lifetimes),*>(core::marker::PhantomData<#(&#lifetimes)* ()>);
+                struct IndexedVisitor #impl_generics (core::marker::PhantomData<#ident #ty_generics>);
 
-                impl<#de_lifetime, #(#lifetimes),*> serde::de::Visitor<'de> for IndexedVisitor<#(#lifetimes),*> {
-                    type Value = #ident<#(#lifetimes),*>;
+                impl #impl_generics_with_de serde::de::Visitor<'de> for IndexedVisitor #ty_generics {
+                    type Value = #ident #ty_generics;
 
                     fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
                         formatter.write_str(stringify!(#ident))
@@ -239,5 +263,6 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
                 deserializer.deserialize_map(IndexedVisitor(Default::default()))
             }
         }
-    })
+    };
+    TokenStream::from(res)
 }
