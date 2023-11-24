@@ -261,7 +261,7 @@ mod cow {
 
         assert_eq!(deserialized, example);
         let Cow::Owned(_) = deserialized.data else {
-        panic!("Expected deserialized data Cow::Owned");
-    };
+            panic!("Expected deserialized data Cow::Owned");
+        };
     }
 }
