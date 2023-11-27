@@ -136,9 +136,8 @@ fn unwrap_expected_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStre
                     let #ident = #ident.ok_or_else(|| serde::de::Error::missing_field(#label))?;
                 }
             } else {
-                // TODO: still confused here, but the tests pass ;)
                 quote! {
-                    // let #ident = #ident.or(None);
+                    let #ident = #ident.unwrap_or_default();
                 }
             }
         })
