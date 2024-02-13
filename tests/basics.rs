@@ -57,6 +57,8 @@ mod some_keys {
     #[serde_indexed(offset = 1)]
     pub struct SomeRefKeys<'a, 'b, 'c> {
         pub number: i32,
+        #[serde(skip)]
+        pub ignored: i32,
         pub bytes: &'a ByteArray<7>,
         pub string: &'b str,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -108,13 +110,14 @@ mod some_keys {
         const BYTE_ARRAY: ByteArray<7> = ByteArray::new([37u8; 7]);
         let value = SomeRefKeys {
             number: -7,
+            ignored: 0,
             bytes: &BYTE_ARRAY,
             string: "so serde",
             option: None,
             vector: Bytes::new(&[42]),
         };
-        // in Python: cbor2.dumps({1: -7, 2: bytes([37]*7), 3: "so serde", 5: bytes([42]*1)}).
-        let serialized: &[u8] = &hex!("a401260247252525252525250368736f20736572646505412a");
+        // in Python: cbor2.dumps({1: -7, 3: bytes([37]*7), 4: "so serde", 6: bytes([42]*1)}).
+        let serialized: &[u8] = &hex!("a401260347252525252525250468736f20736572646506412a");
         (serialized, value)
     }
 
@@ -130,8 +133,8 @@ mod some_keys {
     fn another_ref_example() -> (&'static [u8], SomeRefKeys<'static, 'static, 'static>) {
         let (_, mut an_example) = a_ref_example();
         an_example.option = Some(0xff);
-        // in Python: cbor2.dumps({1: -7, 2: bytes([37]*7), 3: "so serde", 4: 0xff,  5: bytes([42]*1)}).hex()
-        let serialized: &[u8] = &hex!("a501260247252525252525250368736f2073657264650418ff05412a");
+        // in Python: cbor2.dumps({1: -7, 3: bytes([37]*7), 4: "so serde", 5: 0xff,  6: bytes([42]*1)}).hex()
+        let serialized: &[u8] = &hex!("a501260347252525252525250468736f2073657264650518ff06412a");
         (serialized, an_example)
     }
 
@@ -196,11 +199,11 @@ mod some_keys {
                 Token::Map { len: Some(4) },
                 Token::U64(1),
                 Token::I32(-7),
-                Token::U64(2),
-                Token::BorrowedBytes(&[37; 7]),
                 Token::U64(3),
+                Token::BorrowedBytes(&[37; 7]),
+                Token::U64(4),
                 Token::BorrowedStr("so serde"),
-                Token::U64(5),
+                Token::U64(6),
                 Token::BorrowedBytes(&[42]),
                 Token::MapEnd,
             ],
@@ -211,14 +214,14 @@ mod some_keys {
                 Token::Map { len: Some(5) },
                 Token::U64(1),
                 Token::I32(-7),
-                Token::U64(2),
-                Token::BorrowedBytes(&[37; 7]),
                 Token::U64(3),
-                Token::BorrowedStr("so serde"),
+                Token::BorrowedBytes(&[37; 7]),
                 Token::U64(4),
+                Token::BorrowedStr("so serde"),
+                Token::U64(5),
                 Token::Some,
                 Token::U8(0xFF),
-                Token::U64(5),
+                Token::U64(6),
                 Token::BorrowedBytes(&[42]),
                 Token::MapEnd,
             ],

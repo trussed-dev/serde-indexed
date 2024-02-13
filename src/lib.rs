@@ -116,6 +116,7 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
 fn none_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStream> {
     fields
         .iter()
+        .filter(|f| !f.skip_serializing_if.is_always())
         .map(|field| {
             let ident = format_ident!("{}", &field.label);
             quote! {
@@ -131,14 +132,16 @@ fn unwrap_expected_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStre
         .map(|field| {
             let label = field.label.clone();
             let ident = format_ident!("{}", &field.label);
-            if field.skip_serializing_if.is_none() {
-                quote! {
+            match field.skip_serializing_if {
+                Skip::None => quote! {
                     let #ident = #ident.ok_or_else(|| serde::de::Error::missing_field(#label))?;
-                }
-            } else {
-                quote! {
+                },
+                Skip::If(_) => quote! {
                     let #ident = #ident.unwrap_or_default();
-                }
+                },
+                Skip::Always => quote! {
+                    let #ident = ::core::default::Default::default();
+                },
             }
         })
         .collect()
@@ -147,6 +150,7 @@ fn unwrap_expected_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStre
 fn match_fields(fields: &[parse::Field], offset: usize) -> Vec<proc_macro2::TokenStream> {
     fields
         .iter()
+        .filter(|f| !f.skip_serializing_if.is_always())
         .map(|field| {
             let label = field.label.clone();
             let ident = format_ident!("{}", &field.label);

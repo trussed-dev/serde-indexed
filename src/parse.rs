@@ -26,6 +26,9 @@ impl Skip {
     pub fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
+    pub fn is_always(&self) -> bool {
+        matches!(self, Self::Always)
+    }
 }
 
 pub struct Field {
@@ -107,7 +110,37 @@ fn fields_from_ast(
     fields
         .iter()
         .enumerate()
-        .map(|(i, field)| {
+        .map(|(index, field)| {
+            let mut skip_serializing_if = Skip::None;
+            for attr in &field.attrs {
+                if attr.path().is_ident("serde") {
+                    attr.parse_nested_meta(|meta| {
+                        if meta.path.is_ident("skip_serializing_if") {
+                            let litstr: LitStr = meta.value()?.parse()?;
+                            let tokens = syn::parse_str(&litstr.value())?;
+                            if !skip_serializing_if.is_none() {
+                                return Err(meta
+                                    .error("Multiple attributes for skip_serializing_if or skip"));
+                            }
+                            skip_serializing_if = Skip::If(syn::parse2(tokens)?);
+                            Ok(())
+                        } else if meta.path.is_ident("skip") {
+                            if meta.value().is_ok() {
+                                return Err(meta.error("`skip` does not expect any value"));
+                            }
+                            if !skip_serializing_if.is_none() {
+                                return Err(meta
+                                    .error("Multiple attributes for skip_serializing_if or skip"));
+                            }
+                            skip_serializing_if = Skip::Always;
+                            Ok(())
+                        } else {
+                            Err(meta.error("Unkown field attribute"))
+                        }
+                    })?;
+                }
+            }
+
             Ok(Field {
                 // these are https://docs.rs/syn/2.0.28/syn/struct.Field.html
                 label: match &field.ident {
@@ -122,42 +155,9 @@ fn fields_from_ast(
                         return Err(Error::new_spanned(fields, "Tuple struct are not supported"));
                     }
                 },
-                index: i,
+                index,
                 // TODO: make this... more concise? handle errors? the thing with the spans?
-                skip_serializing_if: {
-                    let mut skip_serializing_if = Skip::None;
-                    for attr in &field.attrs {
-                        if attr.path().is_ident("serde") {
-                            attr.parse_nested_meta(|meta| {
-                                if meta.path.is_ident("skip_serializing_if") {
-                                    let litstr: LitStr = meta.value()?.parse()?;
-                                    let tokens = syn::parse_str(&litstr.value())?;
-                                    if !skip_serializing_if.is_none() {
-                                        return Err(meta.error(
-                                            "Multiple attributes for skip_serializing_if or skip",
-                                        ));
-                                    }
-                                    skip_serializing_if = Skip::If(syn::parse2(tokens)?);
-                                    Ok(())
-                                } else if meta.path.is_ident("skip") {
-                                    if meta.value().is_ok() {
-                                        return Err(meta.error("`skip` does not expect any value"));
-                                    }
-                                    if !skip_serializing_if.is_none() {
-                                        return Err(meta.error(
-                                            "Multiple attributes for skip_serializing_if or skip",
-                                        ));
-                                    }
-                                    skip_serializing_if = Skip::Always;
-                                    Ok(())
-                                } else {
-                                    Err(meta.error("Unkown field attribute"))
-                                }
-                            })?;
-                        }
-                    }
-                    skip_serializing_if
-                },
+                skip_serializing_if,
             })
         })
         .collect()
