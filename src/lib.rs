@@ -30,6 +30,7 @@ extern crate proc_macro;
 
 mod parse;
 
+use parse::Skip;
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{format_ident, quote};
@@ -40,23 +41,20 @@ use crate::parse::Input;
 fn serialize_fields(fields: &[parse::Field], offset: usize) -> Vec<proc_macro2::TokenStream> {
     fields
         .iter()
-        .map(|field| {
+        .filter_map(|field| {
             let index = field.index + offset;
             let member = &field.member;
             // println!("field {:?} index {:?}", &field.label, field.index);
             match &field.skip_serializing_if {
-                Some(path) => {
-                    quote! {
-                        if !#path(&self.#member) {
-                            map.serialize_entry(&#index, &self.#member)?;
-                        }
-                    }
-                }
-                None => {
-                    quote! {
+                Skip::If(path) => Some(quote! {
+                    if !#path(&self.#member) {
                         map.serialize_entry(&#index, &self.#member)?;
                     }
-                }
+                }),
+                Skip::Always => None,
+                Skip::None => Some(quote! {
+                    map.serialize_entry(&#index, &self.#member)?;
+                }),
             }
         })
         .collect()
@@ -69,10 +67,12 @@ fn count_serialized_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStr
             // let index = field.index + offset;
             let member = &field.member;
             match &field.skip_serializing_if {
-                Some(path) => {
+                Skip::If(path) => {
                     quote! { if #path(&self.#member) { 0 } else { 1 } }
                 }
-                None => {
+                Skip::Always => quote! { 0 },
+
+                Skip::None => {
                     quote! { 1 }
                 }
             }

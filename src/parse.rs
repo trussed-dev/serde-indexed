@@ -16,11 +16,23 @@ pub struct StructAttrs {
     // pub skip_nones: bool,
 }
 
+pub enum Skip {
+    None,
+    If(syn::ExprPath),
+    Always,
+}
+
+impl Skip {
+    pub fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+}
+
 pub struct Field {
     pub label: String,
     pub member: syn::Member,
     pub index: usize,
-    pub skip_serializing_if: Option<syn::ExprPath>,
+    pub skip_serializing_if: Skip,
 }
 
 fn parse_meta(attrs: &mut StructAttrs, meta: ParseNestedMeta) -> Result<()> {
@@ -113,18 +125,30 @@ fn fields_from_ast(
                 index: i,
                 // TODO: make this... more concise? handle errors? the thing with the spans?
                 skip_serializing_if: {
-                    let mut skip_serializing_if = None;
+                    let mut skip_serializing_if = Skip::None;
                     for attr in &field.attrs {
                         if attr.path().is_ident("serde") {
                             attr.parse_nested_meta(|meta| {
                                 if meta.path.is_ident("skip_serializing_if") {
                                     let litstr: LitStr = meta.value()?.parse()?;
                                     let tokens = syn::parse_str(&litstr.value())?;
-                                    if skip_serializing_if.is_some() {
-                                        return Err(meta
-                                            .error("Multiple attributes for skip_serializing_if"));
+                                    if !skip_serializing_if.is_none() {
+                                        return Err(meta.error(
+                                            "Multiple attributes for skip_serializing_if or skip",
+                                        ));
                                     }
-                                    skip_serializing_if = Some(syn::parse2(tokens)?);
+                                    skip_serializing_if = Skip::If(syn::parse2(tokens)?);
+                                    Ok(())
+                                } else if meta.path.is_ident("skip") {
+                                    if meta.value().is_ok() {
+                                        return Err(meta.error("`skip` does not expect any value"));
+                                    }
+                                    if !skip_serializing_if.is_none() {
+                                        return Err(meta.error(
+                                            "Multiple attributes for skip_serializing_if or skip",
+                                        ));
+                                    }
+                                    skip_serializing_if = Skip::Always;
                                     Ok(())
                                 } else {
                                     Err(meta.error("Unkown field attribute"))
