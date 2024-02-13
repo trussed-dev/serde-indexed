@@ -57,6 +57,8 @@ mod some_keys {
     #[serde_indexed(offset = 1)]
     pub struct SomeRefKeys<'a, 'b, 'c> {
         pub number: i32,
+        #[serde(skip)]
+        pub ignored: i32,
         pub bytes: &'a ByteArray<7>,
         pub string: &'b str,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -108,6 +110,7 @@ mod some_keys {
         const BYTE_ARRAY: ByteArray<7> = ByteArray::new([37u8; 7]);
         let value = SomeRefKeys {
             number: -7,
+            ignored: 0,
             bytes: &BYTE_ARRAY,
             string: "so serde",
             option: None,
