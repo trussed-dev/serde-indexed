@@ -38,6 +38,7 @@ pub struct Field {
     pub skip_serializing_if: Skip,
     pub serialize_with: Option<syn::ExprPath>,
     pub deserialize_with: Option<syn::ExprPath>,
+    pub ty: syn::Type,
 }
 
 fn parse_meta(attrs: &mut StructAttrs, meta: ParseNestedMeta) -> Result<()> {
@@ -190,6 +191,7 @@ fn fields_from_ast(
                 },
                 index: current_index,
                 // TODO: make this... more concise? handle errors? the thing with the spans?
+                ty: field.ty.clone(),
                 skip_serializing_if,
                 serialize_with,
                 deserialize_with,

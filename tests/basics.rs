@@ -418,6 +418,7 @@ mod generics {
     use heapless::String;
     use serde_byte_array::ByteArray;
     use serde_bytes::Bytes;
+    use serde_test::assert_ser_tokens;
 
     #[derive(PartialEq, Debug, SerializeIndexed, DeserializeIndexed)]
     #[serde_indexed(offset = 1)]
@@ -521,5 +522,26 @@ mod generics {
             cbor_deserialize_with_scratch(SERIALIZED_ALL_GENERIC_EXAMPLE, &mut []).unwrap();
 
         assert_eq!(deserialized, example);
+    }
+
+    #[test]
+    fn serialize_with() {
+        #[derive(serde_indexed::SerializeIndexed)]
+        struct SerializeWith {
+            #[serde(serialize_with = "serde_bytes::serialize")]
+            data: Vec<u8>,
+        }
+
+        let value = SerializeWith { data: vec![0; 128] };
+
+        assert_ser_tokens(
+            &value,
+            &[
+                Token::Map { len: Some(1) },
+                Token::U64(0),
+                Token::Bytes(&[0; 128]),
+                Token::MapEnd,
+            ],
+        )
     }
 }
