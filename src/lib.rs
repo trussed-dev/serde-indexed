@@ -181,12 +181,45 @@ fn match_fields(fields: &[parse::Field], offset: usize) -> Vec<proc_macro2::Toke
             let label = field.label.clone();
             let ident = format_ident!("{}", &field.label);
             let index = field.index + offset;
+
+            let next_value = match &field.deserialize_with {
+                Some(f) => {
+                    let ty = &field.ty;
+                    quote!({
+                            struct __DeserializeWith< 'de> {
+                                value: #ty,
+                                lifetime: ::core::marker::PhantomData<&'de ()>,
+                            }
+                            impl<'de> serde::Deserialize<'de> for __DeserializeWith<'de> {
+                                fn deserialize<__D>(
+                                    __deserializer: __D,
+                                ) -> Result<Self, __D::Error>
+                                where
+                                    __D: serde::Deserializer<'de>,
+                                {
+
+                                    Ok(__DeserializeWith {
+                                        value: #f(__deserializer)?,
+                                        lifetime: ::core::marker::PhantomData,
+                                    })
+                                }
+                            }
+
+                            let __DeserializeWith { value, lifetime: _ } = map.next_value()?;
+                            value
+                        }
+                    )
+                }
+                None => quote!(map.next_value()?),
+            };
+
             quote! {
                 #index => {
                     if #ident.is_some() {
                         return Err(serde::de::Error::duplicate_field(#label));
                     }
-                    #ident = Some(map.next_value()?);
+                    let next_value = #next_value;
+                    #ident = Some(next_value);
                 },
             }
         })
