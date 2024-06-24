@@ -565,4 +565,27 @@ mod generics {
             ],
         )
     }
+
+    #[test]
+    fn with() {
+        #[derive(
+            serde_indexed::SerializeIndexed, serde_indexed::DeserializeIndexed, PartialEq, Eq, Debug,
+        )]
+        struct SerializeWith {
+            #[serde(with = "serde_bytes")]
+            data: Vec<u8>,
+        }
+
+        let value = SerializeWith { data: vec![0; 128] };
+
+        assert_tokens(
+            &value,
+            &[
+                Token::Map { len: Some(1) },
+                Token::U64(0),
+                Token::Bytes(&[0; 128]),
+                Token::MapEnd,
+            ],
+        )
+    }
 }
