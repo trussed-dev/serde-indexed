@@ -21,6 +21,8 @@ pub struct Field {
     pub member: syn::Member,
     pub index: usize,
     pub skip_serializing_if: Option<syn::ExprPath>,
+    pub serialize_with: Option<syn::ExprPath>,
+    pub deserialize_with: Option<syn::ExprPath>,
     // pub attrs: attr::Field,
     pub ty: syn::Type,
     pub original: syn::Field,
@@ -99,6 +101,38 @@ fn fields_from_ast(
         .iter()
         .enumerate()
         .map(|(i, field)| {
+            // Parse attributes
+            let mut skip_serializing_if = None;
+            let mut serialize_with = None;
+            let mut deserialize_with = None;
+
+            for attr in &field.attrs {
+                if attr.path().is_ident("serde") {
+                    attr.parse_nested_meta(|meta| {
+                        let parse_value = |attribute: &mut Option<_>, attribute_name: &str| {
+                            let litstr: LitStr = meta.value()?.parse()?;
+                            let tokens = syn::parse_str(&litstr.value())?;
+                            if attribute.is_some() {
+                                return Err(
+                                    meta.error(format!("Multiple attributes for {attribute_name}"))
+                                );
+                            }
+                            *attribute = Some(syn::parse2(tokens)?);
+                            Ok(())
+                        };
+                        if meta.path.is_ident("skip_serializing_if") {
+                            parse_value(&mut skip_serializing_if, "skip_serializing_if")
+                        } else if meta.path.is_ident("deserialize_with") {
+                            parse_value(&mut deserialize_with, "deserialize_with")
+                        } else if meta.path.is_ident("serialize_with") {
+                            parse_value(&mut serialize_with, "serialize_with")
+                        } else {
+                            return Err(meta.error("Unkown field attribute"));
+                        }
+                    })?;
+                }
+            }
+
             Ok(Field {
                 // these are https://docs.rs/syn/2.0.28/syn/struct.Field.html
                 label: match &field.ident {
@@ -115,28 +149,9 @@ fn fields_from_ast(
                 },
                 index: i,
                 // TODO: make this... more concise? handle errors? the thing with the spans?
-                skip_serializing_if: {
-                    let mut skip_serializing_if = None;
-                    for attr in &field.attrs {
-                        if attr.path().is_ident("serde") {
-                            attr.parse_nested_meta(|meta| {
-                                if meta.path.is_ident("skip_serializing_if") {
-                                    let litstr: LitStr = meta.value()?.parse()?;
-                                    let tokens = syn::parse_str(&litstr.value())?;
-                                    if skip_serializing_if.is_some() {
-                                        return Err(meta
-                                            .error("Multiple attributes for skip_serializing_if"));
-                                    }
-                                    skip_serializing_if = Some(syn::parse2(tokens)?);
-                                    Ok(())
-                                } else {
-                                    Err(meta.error("Unkown field attribute"))
-                                }
-                            })?;
-                        }
-                    }
-                    skip_serializing_if
-                },
+                skip_serializing_if,
+                serialize_with,
+                deserialize_with,
                 ty: field.ty.clone(),
                 original: field.clone(),
             })
