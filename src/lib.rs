@@ -44,16 +44,42 @@ fn serialize_fields(fields: &[parse::Field], offset: usize) -> Vec<proc_macro2::
         .filter_map(|field| {
             let index = field.index + offset;
             let member = &field.member;
+            let serialize_member = match &field.serialize_with {
+                None => quote!(&self.#member),
+                Some(f) => {
+                    let ty = &field.ty;
+                    quote!({
+                            struct __SerializeWith<'__lifetime> {
+                                value: &'__lifetime #ty,
+                            }
+
+                            impl<'__lifetime> serde::Serialize for __SerializeWith<'__lifetime> {
+                                fn serialize<__S>(
+                                    &self,
+                                    __s: __S,
+                                ) -> ::core::result::Result<__S::Ok, __S::Error>
+                                where
+                                    __S: serde::Serializer,
+                                {
+                                    #f(self.value, __s)
+                                }
+                            }
+
+                            &__SerializeWith { value: &self.#member }
+                    })
+                }
+            };
+
             // println!("field {:?} index {:?}", &field.label, field.index);
             match &field.skip_serializing_if {
                 Skip::If(path) => Some(quote! {
                     if !#path(&self.#member) {
-                        map.serialize_entry(&#index, &self.#member)?;
+                        map.serialize_entry(&#index, #serialize_member)?;
                     }
                 }),
                 Skip::Always => None,
                 Skip::Never => Some(quote! {
-                    map.serialize_entry(&#index, &self.#member)?;
+                    map.serialize_entry(&#index, #serialize_member)?;
                 }),
             }
         })
