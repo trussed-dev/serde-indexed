@@ -36,6 +36,8 @@ pub struct Field {
     pub member: syn::Member,
     pub index: usize,
     pub skip_serializing_if: Skip,
+    pub serialize_with: Option<syn::ExprPath>,
+    pub deserialize_with: Option<syn::ExprPath>,
 }
 
 fn parse_meta(attrs: &mut StructAttrs, meta: ParseNestedMeta) -> Result<()> {
@@ -112,9 +114,24 @@ fn fields_from_ast(
         .enumerate()
         .map(|(index, field)| {
             let mut skip_serializing_if = Skip::None;
+            let mut deserialize_with = None;
+            let mut serialize_with = None;
+
             for attr in &field.attrs {
                 if attr.path().is_ident("serde") {
                     attr.parse_nested_meta(|meta| {
+                        let parse_value = |attribute: &mut Option<_>, attribute_name: &str| {
+                            let litstr: LitStr = meta.value()?.parse()?;
+                            let tokens = syn::parse_str(&litstr.value())?;
+                            if attribute.is_some() {
+                                return Err(
+                                    meta.error(format!("Multiple attributes for {attribute_name}"))
+                                );
+                            }
+                            *attribute = Some(syn::parse2(tokens)?);
+                            Ok(())
+                        };
+
                         if meta.path.is_ident("skip_serializing_if") {
                             let litstr: LitStr = meta.value()?.parse()?;
                             let tokens = syn::parse_str(&litstr.value())?;
@@ -134,8 +151,12 @@ fn fields_from_ast(
                             }
                             skip_serializing_if = Skip::Always;
                             Ok(())
+                        } else if meta.path.is_ident("deserialize_with") {
+                            parse_value(&mut deserialize_with, "deserialize_with")
+                        } else if meta.path.is_ident("serialize_with") {
+                            parse_value(&mut serialize_with, "serialize_with")
                         } else {
-                            Err(meta.error("Unkown field attribute"))
+                            return Err(meta.error("Unkown field attribute"));
                         }
                     })?;
                 }
@@ -158,6 +179,8 @@ fn fields_from_ast(
                 index,
                 // TODO: make this... more concise? handle errors? the thing with the spans?
                 skip_serializing_if,
+                serialize_with,
+                deserialize_with,
             })
         })
         .collect()
