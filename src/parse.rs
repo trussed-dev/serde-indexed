@@ -168,6 +168,28 @@ fn fields_from_ast(
                             parse_value(&mut deserialize_with, "deserialize_with")
                         } else if meta.path.is_ident("serialize_with") {
                             parse_value(&mut serialize_with, "serialize_with")
+                        } else if meta.path.is_ident("with") {
+                            let litstr: LitStr = meta.value()?.parse()?;
+                            if serialize_with.is_some() {
+                                return Err(meta.error(format!(
+                                    "Using `with` when `serialize_with` is already used"
+                                )));
+                            }
+                            if deserialize_with.is_some() {
+                                return Err(meta.error(format!(
+                                    "Using `with` when `deserialize_with` is already used"
+                                )));
+                            }
+
+                            let serialize_tokens =
+                                syn::parse_str(&format!("{}::serialize", litstr.value()))?;
+                            let deserialize_tokens =
+                                syn::parse_str(&format!("{}::deserialize", litstr.value()))?;
+
+                            serialize_with = Some(syn::parse2(serialize_tokens)?);
+                            deserialize_with = Some(syn::parse2(deserialize_tokens)?);
+
+                            Ok(())
                         } else {
                             return Err(meta.error("Unkown field attribute"));
                         }
