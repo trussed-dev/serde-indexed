@@ -60,12 +60,12 @@ fn serialize_fields(
                 Some(f) => {
                     let ty = &field.ty;
                     quote!({
-                            struct __SerializeWith #impl_generics_serialize {
-                                value: &'__lifetime #ty,
+                            struct __InternalSerdeIndexedSerializeWith #impl_generics_serialize {
+                                value: &'__serde_indexed_lifetime #ty,
                                 phantom: ::core::marker::PhantomData<#ident #ty_generics>,
                             }
 
-                            impl #impl_generics_serialize serde::Serialize for __SerializeWith #ty_generics_serialize #where_clause {
+                            impl #impl_generics_serialize serde::Serialize for __InternalSerdeIndexedSerializeWith #ty_generics_serialize #where_clause {
                                 fn serialize<__S>(
                                     &self,
                                     __s: __S,
@@ -77,7 +77,7 @@ fn serialize_fields(
                                 }
                             }
 
-                            &__SerializeWith { value: &self.#member, phantom: ::core::marker::PhantomData::<#ident #ty_generics> }
+                            &__InternalSerdeIndexedSerializeWith { value: &self.#member, phantom: ::core::marker::PhantomData::<#ident #ty_generics> }
                     })
                 }
             };
@@ -136,7 +136,7 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
     generics_cl2
         .params
         .push(syn::GenericParam::Lifetime(LifetimeParam::new(
-            Lifetime::new("'__lifetime", Span::call_site()),
+            Lifetime::new("'__serde_indexed_lifetime", Span::call_site()),
         )));
 
     let (impl_generics_serialize, ty_generics_serialize, _) = generics_cl2.split_for_impl();
@@ -225,12 +225,12 @@ fn match_fields(
                 Some(f) => {
                     let ty = &field.ty;
                     quote!({
-                            struct __DeserializeWith #impl_generics_with_de {
+                            struct __InternalSerdeIndexedDeserializeWith #impl_generics_with_de {
                                 value: #ty,
                                 phantom: ::core::marker::PhantomData<#struct_ident #ty_generics>,
                                 lifetime: ::core::marker::PhantomData<&'de ()>,
                             }
-                            impl #impl_generics_with_de serde::Deserialize<'de> for __DeserializeWith #ty_generics_with_de #where_clause {
+                            impl #impl_generics_with_de serde::Deserialize<'de> for __InternalSerdeIndexedDeserializeWith #ty_generics_with_de #where_clause {
                                 fn deserialize<__D>(
                                     __deserializer: __D,
                                 ) -> Result<Self, __D::Error>
@@ -238,7 +238,7 @@ fn match_fields(
                                     __D: serde::Deserializer<'de>,
                                 {
 
-                                    Ok(__DeserializeWith {
+                                    Ok(__InternalSerdeIndexedDeserializeWith {
                                         value: #f(__deserializer)?,
                                         phantom: ::core::marker::PhantomData,
                                         lifetime: ::core::marker::PhantomData,
@@ -246,7 +246,7 @@ fn match_fields(
                                 }
                             }
 
-                            let __DeserializeWith { value, lifetime: _, phantom: _ } = map.next_value()?;
+                            let __InternalSerdeIndexedDeserializeWith { value, lifetime: _, phantom: _ } = map.next_value()?;
                             value
                         }
                     )
