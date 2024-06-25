@@ -548,12 +548,12 @@ mod generics {
     #[test]
     fn deserialize_with() {
         #[derive(serde_indexed::DeserializeIndexed, PartialEq, Eq, Debug)]
-        struct SerializeWith {
+        struct DeserializeWith {
             #[serde(deserialize_with = "serde_bytes::deserialize")]
             data: Vec<u8>,
         }
 
-        let value = SerializeWith { data: vec![0; 128] };
+        let value = DeserializeWith { data: vec![0; 128] };
 
         assert_de_tokens(
             &value,
@@ -584,6 +584,29 @@ mod generics {
                 Token::Map { len: Some(1) },
                 Token::U64(0),
                 Token::Bytes(&[0; 128]),
+                Token::MapEnd,
+            ],
+        )
+    }
+
+    #[test]
+    fn with_lifetime() {
+        #[derive(
+            serde_indexed::SerializeIndexed, serde_indexed::DeserializeIndexed, PartialEq, Eq, Debug,
+        )]
+        struct SerializeWith<'a> {
+            #[serde(with = "serde_bytes")]
+            data: &'a [u8],
+        }
+
+        let value = SerializeWith { data: &[0; 128] };
+
+        assert_tokens(
+            &value,
+            &[
+                Token::Map { len: Some(1) },
+                Token::U64(0),
+                Token::BorrowedBytes(&[0; 128]),
                 Token::MapEnd,
             ],
         )
