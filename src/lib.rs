@@ -32,7 +32,7 @@ mod parse;
 
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
-use quote::{format_ident, quote, ToTokens};
+use quote::{format_ident, quote, quote_spanned, ToTokens};
 use syn::{
     parse_macro_input, ImplGenerics, Lifetime, LifetimeParam, TypeGenerics, TypeParamBound,
     WhereClause,
@@ -196,7 +196,8 @@ fn none_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStream> {
         .iter()
         .map(|field| {
             let ident = format_ident!("{}", &field.label);
-            quote! {
+            let span = field.original_span;
+            quote_spanned! { span =>
                 let mut #ident = None;
             }
         })
@@ -209,12 +210,13 @@ fn unwrap_expected_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStre
         .map(|field| {
             let label = field.label.clone();
             let ident = format_ident!("{}", &field.label);
+            let span = field.original_span;
             if field.skip_serializing_if.is_none() {
-                quote! {
+                quote_spanned! { span => 
                     let #ident = #ident.ok_or_else(|| serde::de::Error::missing_field(#label))?;
                 }
             } else {
-                quote! {
+                quote_spanned! { span => 
                     let #ident = #ident.unwrap_or_default();
                 }
             }
@@ -237,11 +239,12 @@ fn match_fields(
             let label = field.label.clone();
             let ident = format_ident!("{}", &field.label);
             let index = field.index + offset;
+            let span = field.original_span;
 
             let next_value = match &field.deserialize_with {
                 Some(f) => {
                     let ty = &field.ty;
-                    quote!({
+                    quote_spanned!(span => {
                             struct __InternalSerdeIndexedDeserializeWith #impl_generics_with_de {
                                 value: #ty,
                                 phantom: ::core::marker::PhantomData<#struct_ident #ty_generics>,
@@ -268,10 +271,10 @@ fn match_fields(
                         }
                     )
                 }
-                None => quote!(map.next_value()?),
+                None => quote_spanned!(span => map.next_value()?),
             };
 
-            quote! {
+            quote_spanned!{ span => 
                 #index => {
                     if #ident.is_some() {
                         return Err(serde::de::Error::duplicate_field(#label));
@@ -289,7 +292,8 @@ fn all_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStream> {
         .iter()
         .map(|field| {
             let ident = format_ident!("{}", &field.label);
-            quote! {
+            let span = field.original_span;
+            quote_spanned! { span =>
                 #ident
             }
         })

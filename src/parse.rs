@@ -1,6 +1,7 @@
 use proc_macro2::Span;
 use syn::meta::ParseNestedMeta;
 use syn::parse::{Error, Parse, ParseStream, Result};
+use syn::spanned::Spanned;
 use syn::{Data, DeriveInput, Fields, Generics, Ident, LitInt, LitStr, Token};
 
 pub struct Input {
@@ -25,7 +26,7 @@ pub struct Field {
     pub deserialize_with: Option<syn::ExprPath>,
     // pub attrs: attr::Field,
     pub ty: syn::Type,
-    pub original: syn::Field,
+    pub original_span: Span,
 }
 
 fn parse_meta(attrs: &mut StructAttrs, meta: ParseNestedMeta) -> Result<()> {
@@ -129,10 +130,16 @@ fn fields_from_ast(
                         } else if meta.path.is_ident("with") {
                             let litstr: LitStr = meta.value()?.parse()?;
                             if serialize_with.is_some() {
-                                return Err(meta.error("Using `with` when `serialize_with` is already used".to_string()));
+                                return Err(meta.error(
+                                    "Using `with` when `serialize_with` is already used"
+                                        .to_string(),
+                                ));
                             }
                             if deserialize_with.is_some() {
-                                return Err(meta.error("Using `with` when `deserialize_with` is already used".to_string()));
+                                return Err(meta.error(
+                                    "Using `with` when `deserialize_with` is already used"
+                                        .to_string(),
+                                ));
                             }
 
                             let serialize_tokens =
@@ -171,7 +178,7 @@ fn fields_from_ast(
                 serialize_with,
                 deserialize_with,
                 ty: field.ty.clone(),
-                original: field.clone(),
+                original_span: field.span(),
             })
         })
         .collect()
