@@ -171,14 +171,10 @@ fn fields_from_ast(
                         } else if meta.path.is_ident("with") {
                             let litstr: LitStr = meta.value()?.parse()?;
                             if serialize_with.is_some() {
-                                return Err(meta.error(format!(
-                                    "Using `with` when `serialize_with` is already used"
-                                )));
+                                return Err(meta.error("Using `with` when `serialize_with` is already used".to_string()));
                             }
                             if deserialize_with.is_some() {
-                                return Err(meta.error(format!(
-                                    "Using `with` when `deserialize_with` is already used"
-                                )));
+                                return Err(meta.error("Using `with` when `deserialize_with` is already used".to_string()));
                             }
 
                             let serialize_tokens =
