@@ -22,7 +22,6 @@ syn = "2.0"
 heapless = { version = "0.7.16", default-features = false, features = ["serde"] }
 hex-literal = "0.4.1"
 serde = { version = "1" }
-serde-byte-array = "0.1.2"
-serde_bytes = { version = "0.11.12" }
+serde_bytes = { version = "0.11.15" }
 serde_cbor = { version = "0.11.0" }
 serde_test = "1.0.176"
