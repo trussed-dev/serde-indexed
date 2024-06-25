@@ -331,7 +331,7 @@ mod cow {
         }
     }
 
-    const SERIALIZED_LIFETIME_EXAMPLE: &'static [u8] = b"\xa1\x01\x83\x01\x02\x03";
+    const SERIALIZED_LIFETIME_EXAMPLE: &[u8] = b"\xa1\x01\x83\x01\x02\x03";
 
     #[test]
     fn tokens() {
@@ -469,7 +469,7 @@ mod generics {
 
     #[test]
     fn all_generics() {
-        const SERIALIZED_ALL_GENERIC_EXAMPLE: &'static [u8] = b"\xa4\x01\x82\x63\x61\x62\x63\x65\x61\x63\x64\x65\x66\x02\x83\x01\x02\x03\x03\x45\x62\x79\x74\x65\x73\x04\x43\x31\x32\x33";
+        const SERIALIZED_ALL_GENERIC_EXAMPLE: &[u8] = b"\xa4\x01\x82\x63\x61\x62\x63\x65\x61\x63\x64\x65\x66\x02\x83\x01\x02\x03\x03\x45\x62\x79\x74\x65\x73\x04\x43\x31\x32\x33";
         let data = all_generics_example();
         let mut buf = [0u8; 64];
         let size = cbor_serialize(&data, &mut buf).unwrap();

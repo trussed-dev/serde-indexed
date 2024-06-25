@@ -335,8 +335,8 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     let match_fields = match_fields(
         &input.fields,
         input.attrs.offset,
-        &impl_generics_with_de.0,
-        &ty_generics.0,
+        impl_generics_with_de.0,
+        ty_generics.0,
         &ty_generics_with_de,
         where_clause,
         &ident,
