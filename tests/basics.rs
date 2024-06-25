@@ -39,8 +39,7 @@ mod some_keys {
     use super::*;
 
     use hex_literal::hex;
-    use serde_byte_array::ByteArray;
-    use serde_bytes::Bytes;
+    use serde_bytes::{ByteArray, Bytes};
     use serde_test::assert_de_tokens;
 
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
@@ -416,8 +415,7 @@ mod cow {
 mod generics {
     use super::*;
     use heapless::String;
-    use serde_byte_array::ByteArray;
-    use serde_bytes::Bytes;
+    use serde_bytes::{ByteArray, Bytes};
     use serde_test::{assert_de_tokens, assert_ser_tokens};
 
     #[derive(PartialEq, Debug, SerializeIndexed, DeserializeIndexed)]
