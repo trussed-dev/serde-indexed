@@ -21,9 +21,6 @@ pub struct Field {
     pub member: syn::Member,
     pub index: usize,
     pub skip_serializing_if: Option<syn::ExprPath>,
-    // pub attrs: attr::Field,
-    pub ty: syn::Type,
-    pub original: syn::Field,
 }
 
 fn parse_meta(attrs: &mut StructAttrs, meta: ParseNestedMeta) -> Result<()> {
@@ -143,8 +140,6 @@ fn fields_from_ast(
                     }
                     skip_serializing_if
                 },
-                ty: field.ty.clone(),
-                original: field.clone(),
             })
         })
         .collect()

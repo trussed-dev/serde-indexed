@@ -240,7 +240,7 @@ mod cow {
         }
     }
 
-    const SERIALIZED_LIFETIME_EXAMPLE: &'static [u8] = b"\xa1\x01\x83\x01\x02\x03";
+    const SERIALIZED_LIFETIME_EXAMPLE: &[u8] = b"\xa1\x01\x83\x01\x02\x03";
 
     #[test]
     fn serialize() {
@@ -261,7 +261,7 @@ mod cow {
 
         assert_eq!(deserialized, example);
         let Cow::Owned(_) = deserialized.data else {
-        panic!("Expected deserialized data Cow::Owned");
-    };
+            panic!("Expected deserialized data Cow::Owned");
+        };
     }
 }
