@@ -1,0 +1,56 @@
+name: CI
+
+on: [push, pull_request]
+
+env:
+  RUST_CHANNEL: stable
+
+jobs:
+  build:
+    name: Build library
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Install rust
+      run: |
+        rustup toolchain install ${{ env.RUST_CHANNEL }} --profile minimal
+        rustup default ${{ env.RUST_CHANNEL }}
+    - name: Build library
+      run: |
+        cargo build --all-targets
+
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Install rust
+      run: |
+        rustup toolchain install ${{ env.RUST_CHANNEL }} --profile minimal
+        rustup default ${{ env.RUST_CHANNEL }}
+    - name: Run tests
+      run: cargo test
+
+  clippy:
+    name: Run clippy
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Install rust
+      run: |
+        rustup toolchain install ${{ env.RUST_CHANNEL }} --profile minimal --component clippy
+        rustup default ${{ env.RUST_CHANNEL }}
+    - name: Run clippy
+      run: cargo clippy --all-targets -- -D warnings
+
+  fmt:
+    name: Run rustfmt
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Install rust
+      run: |
+        rustup toolchain install ${{ env.RUST_CHANNEL }} --profile minimal --component rustfmt
+        rustup default ${{ env.RUST_CHANNEL }}
+    - name: Run rustfmt
+      run: cargo fmt -- --check
