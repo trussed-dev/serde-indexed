@@ -405,7 +405,7 @@ mod generics {
         option: Option<u8>,
     }
 
-    fn const_generics_example<'a>() -> WithConstGeneric<3> {
+    fn const_generics_example() -> WithConstGeneric<3> {
         WithConstGeneric {
             data: ByteArray::new([1, 2, 3]),
             option: None,
