@@ -1,13 +1,13 @@
 use proc_macro2::Span;
 use syn::meta::ParseNestedMeta;
 use syn::parse::{Error, Parse, ParseStream, Result};
-use syn::{Data, DeriveInput, Fields, Ident, Lifetime, LitInt, LitStr, Token};
+use syn::{Data, DeriveInput, Fields, Generics, Ident, LitInt, LitStr, Token};
 
 pub struct Input {
     pub ident: Ident,
     pub attrs: StructAttrs,
     pub fields: Vec<Field>,
-    pub lifetimes: Vec<Lifetime>,
+    pub generics: Generics,
 }
 
 #[derive(Default)]
@@ -16,11 +16,26 @@ pub struct StructAttrs {
     // pub skip_nones: bool,
 }
 
+pub enum Skip {
+    None,
+    If(syn::ExprPath),
+    Always,
+}
+
+impl Skip {
+    pub fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+    pub fn is_always(&self) -> bool {
+        matches!(self, Self::Always)
+    }
+}
+
 pub struct Field {
     pub label: String,
     pub member: syn::Member,
     pub index: usize,
-    pub skip_serializing_if: Option<syn::ExprPath>,
+    pub skip_serializing_if: Skip,
 }
 
 fn parse_meta(attrs: &mut StructAttrs, meta: ParseNestedMeta) -> Result<()> {
@@ -54,10 +69,6 @@ fn parse_attrs(attrs: &Vec<syn::Attribute>) -> Result<StructAttrs> {
     Ok(struct_attrs)
 }
 
-fn lifetimes(generics: &syn::Generics) -> Vec<Lifetime> {
-    generics.lifetimes().map(|l| l.lifetime.clone()).collect()
-}
-
 impl Parse for Input {
     fn parse(input: ParseStream) -> Result<Self> {
         let call_site = Span::call_site();
@@ -81,15 +92,13 @@ impl Parse for Input {
 
         let fields = fields_from_ast(&syn_fields.named)?;
 
-        let lifetimes = lifetimes(&derive_input.generics);
-
         //serde::internals::ast calls `fields_from_ast(cx, &fields.named, attrs, container_default)`
 
         Ok(Input {
             ident: derive_input.ident,
             attrs,
             fields,
-            lifetimes,
+            generics: derive_input.generics,
         })
     }
 }
@@ -101,7 +110,37 @@ fn fields_from_ast(
     fields
         .iter()
         .enumerate()
-        .map(|(i, field)| {
+        .map(|(index, field)| {
+            let mut skip_serializing_if = Skip::None;
+            for attr in &field.attrs {
+                if attr.path().is_ident("serde") {
+                    attr.parse_nested_meta(|meta| {
+                        if meta.path.is_ident("skip_serializing_if") {
+                            let litstr: LitStr = meta.value()?.parse()?;
+                            let tokens = syn::parse_str(&litstr.value())?;
+                            if !skip_serializing_if.is_none() {
+                                return Err(meta
+                                    .error("Multiple attributes for skip_serializing_if or skip"));
+                            }
+                            skip_serializing_if = Skip::If(syn::parse2(tokens)?);
+                            Ok(())
+                        } else if meta.path.is_ident("skip") {
+                            if meta.value().is_ok() {
+                                return Err(meta.error("`skip` does not expect any value"));
+                            }
+                            if !skip_serializing_if.is_none() {
+                                return Err(meta
+                                    .error("Multiple attributes for skip_serializing_if or skip"));
+                            }
+                            skip_serializing_if = Skip::Always;
+                            Ok(())
+                        } else {
+                            Err(meta.error("Unkown field attribute"))
+                        }
+                    })?;
+                }
+            }
+
             Ok(Field {
                 // these are https://docs.rs/syn/2.0.28/syn/struct.Field.html
                 label: match &field.ident {
@@ -116,30 +155,9 @@ fn fields_from_ast(
                         return Err(Error::new_spanned(fields, "Tuple struct are not supported"));
                     }
                 },
-                index: i,
+                index,
                 // TODO: make this... more concise? handle errors? the thing with the spans?
-                skip_serializing_if: {
-                    let mut skip_serializing_if = None;
-                    for attr in &field.attrs {
-                        if attr.path().is_ident("serde") {
-                            attr.parse_nested_meta(|meta| {
-                                if meta.path.is_ident("skip_serializing_if") {
-                                    let litstr: LitStr = meta.value()?.parse()?;
-                                    let tokens = syn::parse_str(&litstr.value())?;
-                                    if skip_serializing_if.is_some() {
-                                        return Err(meta
-                                            .error("Multiple attributes for skip_serializing_if"));
-                                    }
-                                    skip_serializing_if = Some(syn::parse2(tokens)?);
-                                    Ok(())
-                                } else {
-                                    Err(meta.error("Unkown field attribute"))
-                                }
-                            })?;
-                        }
-                    }
-                    skip_serializing_if
-                },
+                skip_serializing_if,
             })
         })
         .collect()
