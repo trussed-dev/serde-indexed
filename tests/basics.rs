@@ -59,6 +59,8 @@ mod some_keys {
         pub number: i32,
         #[serde(skip)]
         pub ignored: i32,
+        #[serde(skip(no_increment))]
+        pub ignored2: i32,
         pub bytes: &'a ByteArray<7>,
         pub string: &'b str,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -111,6 +113,7 @@ mod some_keys {
         let value = SomeRefKeys {
             number: -7,
             ignored: 0,
+            ignored2: 0,
             bytes: &BYTE_ARRAY,
             string: "so serde",
             option: None,

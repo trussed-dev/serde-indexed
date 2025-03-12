@@ -107,10 +107,13 @@ fn fields_from_ast(
     fields: &syn::punctuated::Punctuated<syn::Field, Token![,]>,
 ) -> Result<Vec<Field>> {
     // serde::internals::ast.rs:L183
+    let mut index = 0;
     fields
         .iter()
-        .enumerate()
-        .map(|(index, field)| {
+        .map(|field| {
+            let current_index = index;
+            index += 1;
+
             let mut skip_serializing_if = Skip::None;
             for attr in &field.attrs {
                 if attr.path().is_ident("serde") {
@@ -125,9 +128,18 @@ fn fields_from_ast(
                             skip_serializing_if = Skip::If(syn::parse2(tokens)?);
                             Ok(())
                         } else if meta.path.is_ident("skip") {
-                            if meta.value().is_ok() {
-                                return Err(meta.error("`skip` does not expect any value"));
+                            if meta.input.peek(syn::token::Paren) {
+                                meta.parse_nested_meta(|skip_meta| {
+                                    if !skip_meta.path.is_ident("no_increment") {
+                                        Err(skip_meta
+                                            .error("`skip` only accepts `no_increment` as value"))
+                                    } else {
+                                        index -= 1;
+                                        Ok(())
+                                    }
+                                })?;
                             }
+
                             if !skip_serializing_if.is_none() {
                                 return Err(meta
                                     .error("Multiple attributes for skip_serializing_if or skip"));
@@ -155,7 +167,7 @@ fn fields_from_ast(
                         return Err(Error::new_spanned(fields, "Tuple struct are not supported"));
                     }
                 },
-                index,
+                index: current_index,
                 // TODO: make this... more concise? handle errors? the thing with the spans?
                 skip_serializing_if,
             })
