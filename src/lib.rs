@@ -224,7 +224,8 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
                 match __serde_indexed_internal_key {
                     #(#match_fields)*
                     _ => {
-                        return Err(serde::de::Error::duplicate_field("inexistent field index"));
+                        // Ignore unknown keys by consuming their value
+                        let _ = map.next_value::<serde::de::IgnoredAny>()?;
                     }
                 }
             }
