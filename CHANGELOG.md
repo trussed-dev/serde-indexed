@@ -4,6 +4,7 @@
 
 [Unreleased]: https://github.com/trussed-dev/serde-indexed/compare/0.1.1...HEAD
 
+- Add support for `#[serde(with)]` ([#16][])
 - Add support for `#[serde(skip)]` ([#14][])
 - Add support for generics ([#11][])
 - skip_serializing_if no longer incorrectly affects deserialization (fixes [#2][])
@@ -12,6 +13,7 @@
 [#2]: https://github.com/trussed-dev/serde-indexed/issues/2
 [#11]: https://github.com/trussed-dev/serde-indexed/pull/11
 [#14]: https://github.com/trussed-dev/serde-indexed/pull/14
+[#16]: https://github.com/trussed-dev/serde-indexed/pull/16
 [#19]: https://github.com/trussed-dev/serde-indexed/pull/19
 
 ## [v0.1.1][] (2024-04-03)
