@@ -4,7 +4,11 @@
 
 [Unreleased]: https://github.com/trussed-dev/serde-indexed/compare/0.1.1...HEAD
 
--
+- Add support for `#[serde(skip)]` ([#14][])
+- Add support for generics ([#11][])
+
+[#14]: https://github.com/trussed-dev/serde-indexed/pull/14
+[#11]: https://github.com/trussed-dev/serde-indexed/pull/11
 
 ## [v0.1.1][] (2024-04-03)
 
