@@ -13,6 +13,7 @@ pub struct Input {
 
 #[derive(Default)]
 pub struct StructAttrs {
+    pub auto_index: bool,
     pub offset: usize,
     // pub skip_nones: bool,
 }
@@ -44,7 +45,10 @@ pub struct Field {
 }
 
 fn parse_meta(attrs: &mut StructAttrs, meta: ParseNestedMeta) -> Result<()> {
-    if meta.path.is_ident("offset") {
+    if meta.path.is_ident("auto_index") {
+        attrs.auto_index = true;
+        Ok(())
+    } else if meta.path.is_ident("offset") {
         let value = meta.value()?;
         let offset: LitInt = value.parse()?;
         attrs.offset = offset.base10_parse()?;
@@ -95,7 +99,7 @@ impl Parse for Input {
             }
         };
 
-        let fields = fields_from_ast(&syn_fields.named)?;
+        let fields = fields_from_ast(&attrs, &syn_fields.named)?;
 
         //serde::internals::ast calls `fields_from_ast(cx, &fields.named, attrs, container_default)`
 
@@ -109,8 +113,16 @@ impl Parse for Input {
 }
 
 fn fields_from_ast(
+    attrs: &StructAttrs,
     fields: &syn::punctuated::Punctuated<syn::Field, Token![,]>,
 ) -> Result<Vec<Field>> {
+    if !attrs.auto_index {
+        return Err(Error::new_spanned(
+            fields,
+            "auto_index attribute must be set",
+        ));
+    }
+
     // serde::internals::ast.rs:L183
     let mut index = 0;
     fields

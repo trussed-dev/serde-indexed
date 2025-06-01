@@ -43,7 +43,7 @@ mod some_keys {
     use serde_test::assert_de_tokens;
 
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
-    #[serde_indexed(offset = 1)]
+    #[serde_indexed(auto_index, offset = 1)]
     pub struct SomeKeys {
         pub number: i32,
         pub bytes: [u8; 7],
@@ -54,7 +54,7 @@ mod some_keys {
     }
 
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
-    #[serde_indexed(offset = 1)]
+    #[serde_indexed(auto_index, offset = 1)]
     pub struct SomeRefKeys<'a, 'b, 'c> {
         pub number: i32,
         #[serde(skip)]
@@ -70,6 +70,7 @@ mod some_keys {
 
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
     // #[serde_indexed(offset = 1)]
+    #[serde_indexed(auto_index)]
     pub struct NakedOption {
         pub option: Option<SomeKeys>,
         pub num: usize,
@@ -78,6 +79,7 @@ mod some_keys {
 
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
     // #[serde_indexed(offset = 1)]
+    #[serde_indexed(auto_index)]
     pub struct NakedRefOption<'a, 'b, 'c> {
         pub option: Option<SomeRefKeys<'a, 'b, 'c>>,
         pub num: usize,
@@ -86,6 +88,7 @@ mod some_keys {
 
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
     // #[serde_indexed(offset = 1)]
+    #[serde_indexed(auto_index)]
     pub struct EmptyStruct {}
 
     fn an_example() -> (&'static [u8], SomeKeys) {
@@ -355,7 +358,7 @@ mod cow {
     use std::borrow::Cow;
 
     #[derive(PartialEq, Debug, SerializeIndexed, DeserializeIndexed)]
-    #[serde_indexed(offset = 1)]
+    #[serde_indexed(auto_index, offset = 1)]
     struct WithLifetimes<'a> {
         data: Cow<'a, [u8]>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -419,7 +422,7 @@ mod generics {
     use serde_test::{assert_de_tokens, assert_ser_tokens};
 
     #[derive(PartialEq, Debug, SerializeIndexed, DeserializeIndexed)]
-    #[serde_indexed(offset = 1)]
+    #[serde_indexed(auto_index, offset = 1)]
     struct WithGeneric<T> {
         data: T,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -434,7 +437,7 @@ mod generics {
     }
 
     #[derive(PartialEq, Debug, SerializeIndexed, DeserializeIndexed)]
-    #[serde_indexed(offset = 1)]
+    #[serde_indexed(auto_index, offset = 1)]
     struct WithConstGeneric<const N: usize> {
         data: ByteArray<N>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -483,7 +486,7 @@ mod generics {
     }
 
     #[derive(PartialEq, Debug, SerializeIndexed, DeserializeIndexed)]
-    #[serde_indexed(offset = 1)]
+    #[serde_indexed(auto_index, offset = 1)]
     struct WithAllGenerics<'a, 'b, T, I, const N: usize, const Z: usize> {
         data1: heapless::Vec<T, N>,
         data2: heapless::Vec<I, Z>,
@@ -525,6 +528,7 @@ mod generics {
     #[test]
     fn serialize_with() {
         #[derive(serde_indexed::SerializeIndexed)]
+        #[serde_indexed(auto_index)]
         struct SerializeWith {
             #[serde(serialize_with = "serde_bytes::serialize")]
             data: Vec<u8>,
@@ -546,6 +550,7 @@ mod generics {
     #[test]
     fn deserialize_with() {
         #[derive(serde_indexed::DeserializeIndexed, PartialEq, Eq, Debug)]
+        #[serde_indexed(auto_index)]
         struct DeserializeWith {
             #[serde(deserialize_with = "serde_bytes::deserialize")]
             data: Vec<u8>,
@@ -569,6 +574,7 @@ mod generics {
         #[derive(
             serde_indexed::SerializeIndexed, serde_indexed::DeserializeIndexed, PartialEq, Eq, Debug,
         )]
+        #[serde_indexed(auto_index)]
         struct SerializeWith {
             #[serde(with = "serde_bytes")]
             data: Vec<u8>,
@@ -592,6 +598,7 @@ mod generics {
         #[derive(
             serde_indexed::SerializeIndexed, serde_indexed::DeserializeIndexed, PartialEq, Eq, Debug,
         )]
+        #[serde_indexed(auto_index)]
         struct SerializeWith<'a> {
             #[serde(with = "serde_bytes")]
             data: &'a [u8],

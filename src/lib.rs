@@ -8,7 +8,7 @@ and a custom `offset` container attribute.
 use serde_indexed::{DeserializeIndexed, SerializeIndexed};
 
 #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
-#[serde_indexed(offset = 1)]
+#[serde_indexed(auto_index, offset = 1)]
 pub struct SomeKeys {
     pub number: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
