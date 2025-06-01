@@ -40,6 +40,7 @@ pub struct Field {
     pub skip_serializing_if: Skip,
     pub serialize_with: Option<syn::ExprPath>,
     pub deserialize_with: Option<syn::ExprPath>,
+    pub no_increment: bool,
     pub ty: syn::Type,
     pub original_span: Span,
 }
@@ -112,6 +113,105 @@ impl Parse for Input {
     }
 }
 
+fn parse_field(index: usize, field: &syn::Field) -> Result<Field> {
+    let ident = field
+        .ident
+        .as_ref()
+        .ok_or_else(|| Error::new_spanned(field, "Tuple structs are not supported"))?;
+
+    let mut skip_serializing_if = Skip::Never;
+    let mut deserialize_with = None;
+    let mut serialize_with = None;
+    let mut no_increment = false;
+
+    for attr in &field.attrs {
+        if attr.path().is_ident("serde") {
+            attr.parse_nested_meta(|meta| {
+                let parse_value = |attribute: &mut Option<_>, attribute_name: &str| {
+                    let litstr: LitStr = meta.value()?.parse()?;
+                    let tokens = syn::parse_str(&litstr.value())?;
+                    if attribute.is_some() {
+                        return Err(meta.error(format!("Multiple attributes for {attribute_name}")));
+                    }
+                    *attribute = Some(syn::parse2(tokens)?);
+                    Ok(())
+                };
+
+                if meta.path.is_ident("skip_serializing_if") {
+                    let litstr: LitStr = meta.value()?.parse()?;
+                    let tokens = syn::parse_str(&litstr.value())?;
+                    if !skip_serializing_if.is_none() {
+                        return Err(
+                            meta.error("Multiple attributes for skip_serializing_if or skip")
+                        );
+                    }
+                    skip_serializing_if = Skip::If(syn::parse2(tokens)?);
+                    Ok(())
+                } else if meta.path.is_ident("skip") {
+                    if meta.input.peek(syn::token::Paren) {
+                        meta.parse_nested_meta(|skip_meta| {
+                            if !skip_meta.path.is_ident("no_increment") {
+                                Err(skip_meta.error("`skip` only accepts `no_increment` as value"))
+                            } else {
+                                no_increment = true;
+                                Ok(())
+                            }
+                        })?;
+                    }
+
+                    if !skip_serializing_if.is_none() {
+                        return Err(
+                            meta.error("Multiple attributes for skip_serializing_if or skip")
+                        );
+                    }
+                    skip_serializing_if = Skip::Always;
+                    Ok(())
+                } else if meta.path.is_ident("deserialize_with") {
+                    parse_value(&mut deserialize_with, "deserialize_with")
+                } else if meta.path.is_ident("serialize_with") {
+                    parse_value(&mut serialize_with, "serialize_with")
+                } else if meta.path.is_ident("with") {
+                    let litstr: LitStr = meta.value()?.parse()?;
+                    if serialize_with.is_some() {
+                        return Err(meta.error(
+                            "Using `with` when `serialize_with` is already used".to_string(),
+                        ));
+                    }
+                    if deserialize_with.is_some() {
+                        return Err(meta.error(
+                            "Using `with` when `deserialize_with` is already used".to_string(),
+                        ));
+                    }
+
+                    let serialize_tokens =
+                        syn::parse_str(&format!("{}::serialize", litstr.value()))?;
+                    let deserialize_tokens =
+                        syn::parse_str(&format!("{}::deserialize", litstr.value()))?;
+
+                    serialize_with = Some(syn::parse2(serialize_tokens)?);
+                    deserialize_with = Some(syn::parse2(deserialize_tokens)?);
+
+                    Ok(())
+                } else {
+                    return Err(meta.error("Unkown field attribute"));
+                }
+            })?;
+        }
+    }
+
+    Ok(Field {
+        label: ident.to_string(),
+        member: syn::Member::Named(ident.clone()),
+        index,
+        ty: field.ty.clone(),
+        skip_serializing_if,
+        serialize_with,
+        deserialize_with,
+        no_increment,
+        original_span: field.span(),
+    })
+}
+
 fn fields_from_ast(
     attrs: &StructAttrs,
     fields: &syn::punctuated::Punctuated<syn::Field, Token![,]>,
@@ -123,118 +223,15 @@ fn fields_from_ast(
         ));
     }
 
-    // serde::internals::ast.rs:L183
     let mut index = 0;
     fields
         .iter()
         .map(|field| {
-            let current_index = index;
-            index += 1;
-
-            let mut skip_serializing_if = Skip::Never;
-            let mut deserialize_with = None;
-            let mut serialize_with = None;
-
-            for attr in &field.attrs {
-                if attr.path().is_ident("serde") {
-                    attr.parse_nested_meta(|meta| {
-                        let parse_value = |attribute: &mut Option<_>, attribute_name: &str| {
-                            let litstr: LitStr = meta.value()?.parse()?;
-                            let tokens = syn::parse_str(&litstr.value())?;
-                            if attribute.is_some() {
-                                return Err(
-                                    meta.error(format!("Multiple attributes for {attribute_name}"))
-                                );
-                            }
-                            *attribute = Some(syn::parse2(tokens)?);
-                            Ok(())
-                        };
-
-                        if meta.path.is_ident("skip_serializing_if") {
-                            let litstr: LitStr = meta.value()?.parse()?;
-                            let tokens = syn::parse_str(&litstr.value())?;
-                            if !skip_serializing_if.is_none() {
-                                return Err(meta
-                                    .error("Multiple attributes for skip_serializing_if or skip"));
-                            }
-                            skip_serializing_if = Skip::If(syn::parse2(tokens)?);
-                            Ok(())
-                        } else if meta.path.is_ident("skip") {
-                            if meta.input.peek(syn::token::Paren) {
-                                meta.parse_nested_meta(|skip_meta| {
-                                    if !skip_meta.path.is_ident("no_increment") {
-                                        Err(skip_meta
-                                            .error("`skip` only accepts `no_increment` as value"))
-                                    } else {
-                                        index -= 1;
-                                        Ok(())
-                                    }
-                                })?;
-                            }
-
-                            if !skip_serializing_if.is_none() {
-                                return Err(meta
-                                    .error("Multiple attributes for skip_serializing_if or skip"));
-                            }
-                            skip_serializing_if = Skip::Always;
-                            Ok(())
-                        } else if meta.path.is_ident("deserialize_with") {
-                            parse_value(&mut deserialize_with, "deserialize_with")
-                        } else if meta.path.is_ident("serialize_with") {
-                            parse_value(&mut serialize_with, "serialize_with")
-                        } else if meta.path.is_ident("with") {
-                            let litstr: LitStr = meta.value()?.parse()?;
-                            if serialize_with.is_some() {
-                                return Err(meta.error(
-                                    "Using `with` when `serialize_with` is already used"
-                                        .to_string(),
-                                ));
-                            }
-                            if deserialize_with.is_some() {
-                                return Err(meta.error(
-                                    "Using `with` when `deserialize_with` is already used"
-                                        .to_string(),
-                                ));
-                            }
-
-                            let serialize_tokens =
-                                syn::parse_str(&format!("{}::serialize", litstr.value()))?;
-                            let deserialize_tokens =
-                                syn::parse_str(&format!("{}::deserialize", litstr.value()))?;
-
-                            serialize_with = Some(syn::parse2(serialize_tokens)?);
-                            deserialize_with = Some(syn::parse2(deserialize_tokens)?);
-
-                            Ok(())
-                        } else {
-                            return Err(meta.error("Unkown field attribute"));
-                        }
-                    })?;
-                }
+            let field = parse_field(index, field)?;
+            if !field.no_increment {
+                index += 1;
             }
-
-            Ok(Field {
-                // these are https://docs.rs/syn/2.0.28/syn/struct.Field.html
-                label: match &field.ident {
-                    Some(ident) => ident.to_string(),
-                    None => {
-                        return Err(Error::new_spanned(fields, "Tuple struct are not supported"));
-                    }
-                },
-                member: match &field.ident {
-                    Some(ident) => syn::Member::Named(ident.clone()),
-                    None => {
-                        return Err(Error::new_spanned(fields, "Tuple struct are not supported"));
-                    }
-                },
-                index: current_index,
-                // TODO: make this... more concise? handle errors? the thing with the spans?
-                ty: field.ty.clone(),
-                skip_serializing_if,
-                serialize_with,
-                deserialize_with,
-                original_span: field.span(),
-            })
+            Ok(field)
         })
         .collect()
 }
