@@ -617,3 +617,42 @@ mod generics {
         )
     }
 }
+
+mod index {
+    use super::*;
+
+    #[derive(PartialEq, Debug, SerializeIndexed, DeserializeIndexed)]
+    struct WithIndices {
+        #[serde(index = 9)]
+        test1: usize,
+        #[serde(index = 2)]
+        test2: usize,
+        #[serde(index = 0x5A)]
+        test3: usize,
+    }
+
+    fn indices_example() -> WithIndices {
+        WithIndices {
+            test1: 42,
+            test2: 1,
+            test3: 99,
+        }
+    }
+
+    #[test]
+    fn tokens() {
+        assert_tokens(
+            &indices_example(),
+            &[
+                Token::Map { len: Some(3) },
+                Token::U64(9),
+                Token::U64(42),
+                Token::U64(2),
+                Token::U64(1),
+                Token::U64(0x5A),
+                Token::U64(99),
+                Token::MapEnd,
+            ],
+        );
+    }
+}

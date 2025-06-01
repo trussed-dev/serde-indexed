@@ -11,6 +11,7 @@
 - No longer fails deserialising maps with unknown fields ([#19][])
 - Prefer explicit indexing over automatically assigned indices ([#17][]):
   - Require `auto_index` attribute to enable automatic index assignment
+  - Add `index` attribute for explicit index assignment
 
 [#2]: https://github.com/trussed-dev/serde-indexed/issues/2
 [#11]: https://github.com/trussed-dev/serde-indexed/pull/11

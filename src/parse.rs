@@ -113,7 +113,12 @@ impl Parse for Input {
     }
 }
 
-fn parse_field(index: usize, field: &syn::Field) -> Result<Field> {
+fn parse_field(
+    attrs: &StructAttrs,
+    auto_index: usize,
+    field: &syn::Field,
+    indices: &mut Vec<usize>,
+) -> Result<Field> {
     let ident = field
         .ident
         .as_ref()
@@ -123,6 +128,7 @@ fn parse_field(index: usize, field: &syn::Field) -> Result<Field> {
     let mut deserialize_with = None;
     let mut serialize_with = None;
     let mut no_increment = false;
+    let mut explicit_index = None;
 
     for attr in &field.attrs {
         if attr.path().is_ident("serde") {
@@ -192,6 +198,22 @@ fn parse_field(index: usize, field: &syn::Field) -> Result<Field> {
                     deserialize_with = Some(syn::parse2(deserialize_tokens)?);
 
                     Ok(())
+                } else if meta.path.is_ident("index") {
+                    if explicit_index.is_some() {
+                        return Err(meta.error("Multiple attributes for index"));
+                    }
+                    if attrs.auto_index {
+                        return Err(meta.error(
+                            "The index attribute cannot be combined with the auto_index attribute",
+                        ));
+                    }
+                    let litint: LitInt = meta.value()?.parse()?;
+                    let int = litint.base10_parse()?;
+                    if indices.contains(&int) {
+                        return Err(meta.error("This index has already been assigned"));
+                    }
+                    explicit_index = Some(int);
+                    Ok(())
                 } else {
                     return Err(meta.error("Unkown field attribute"));
                 }
@@ -199,6 +221,17 @@ fn parse_field(index: usize, field: &syn::Field) -> Result<Field> {
         }
     }
 
+    let index = if attrs.auto_index {
+        auto_index
+    } else if let Some(index) = explicit_index {
+        indices.push(index);
+        index
+    } else {
+        return Err(Error::new_spanned(
+            field,
+            "Field without index attribute and `#[serde(auto_index)]` is not enabled on the struct",
+        ));
+    };
     Ok(Field {
         label: ident.to_string(),
         member: syn::Member::Named(ident.clone()),
@@ -216,18 +249,12 @@ fn fields_from_ast(
     attrs: &StructAttrs,
     fields: &syn::punctuated::Punctuated<syn::Field, Token![,]>,
 ) -> Result<Vec<Field>> {
-    if !attrs.auto_index {
-        return Err(Error::new_spanned(
-            fields,
-            "auto_index attribute must be set",
-        ));
-    }
-
+    let mut indices = Vec::new();
     let mut index = 0;
     fields
         .iter()
         .map(|field| {
-            let field = parse_field(index, field)?;
+            let field = parse_field(attrs, index, field, &mut indices)?;
             if !field.no_increment {
                 index += 1;
             }
