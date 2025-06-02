@@ -52,7 +52,7 @@ fn serialize_fields(fields: &[parse::Field], offset: usize) -> Vec<proc_macro2::
                     }
                 }),
                 Skip::Always => None,
-                Skip::None => Some(quote! {
+                Skip::Never => Some(quote! {
                     map.serialize_entry(&#index, &self.#member)?;
                 }),
             }
@@ -72,7 +72,7 @@ fn count_serialized_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStr
                 }
                 Skip::Always => quote! { 0 },
 
-                Skip::None => {
+                Skip::Never => {
                     quote! { 1 }
                 }
             }
@@ -133,7 +133,7 @@ fn unwrap_expected_fields(fields: &[parse::Field]) -> Vec<proc_macro2::TokenStre
             let label = field.label.clone();
             let ident = format_ident!("{}", &field.label);
             match field.skip_serializing_if {
-                Skip::None => quote! {
+                Skip::Never => quote! {
                     let #ident = #ident.ok_or_else(|| serde::de::Error::missing_field(#label))?;
                 },
                 Skip::If(_) => quote! {

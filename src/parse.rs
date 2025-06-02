@@ -17,14 +17,14 @@ pub struct StructAttrs {
 }
 
 pub enum Skip {
-    None,
+    Never,
     If(syn::ExprPath),
     Always,
 }
 
 impl Skip {
     pub fn is_none(&self) -> bool {
-        matches!(self, Self::None)
+        matches!(self, Self::Never)
     }
     pub fn is_always(&self) -> bool {
         matches!(self, Self::Always)
@@ -114,7 +114,7 @@ fn fields_from_ast(
             let current_index = index;
             index += 1;
 
-            let mut skip_serializing_if = Skip::None;
+            let mut skip_serializing_if = Skip::Never;
             for attr in &field.attrs {
                 if attr.path().is_ident("serde") {
                     attr.parse_nested_meta(|meta| {
