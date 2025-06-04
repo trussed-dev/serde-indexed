@@ -41,6 +41,7 @@ mod some_keys {
     use hex_literal::hex;
     use serde_byte_array::ByteArray;
     use serde_bytes::Bytes;
+    use serde_test::assert_de_tokens;
 
     #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
     #[serde_indexed(offset = 1)]
@@ -315,6 +316,38 @@ mod some_keys {
         let maybe_example: SomeRefKeys = cbor_deserialize(&mut buffer).unwrap();
 
         assert_eq!(maybe_example, example);
+    }
+
+    #[test]
+    fn test_unknown_fields() {
+        let value = an_example().1;
+        assert_de_tokens(
+            &value,
+            &[
+                Token::Map { len: Some(5) },
+                Token::U64(1),
+                Token::I32(-7),
+                Token::U64(2),
+                Token::Tuple { len: 7 },
+                Token::U8(37),
+                Token::U8(37),
+                Token::U8(37),
+                Token::U8(37),
+                Token::U8(37),
+                Token::U8(37),
+                Token::U8(37),
+                Token::TupleEnd,
+                Token::U64(3),
+                Token::Str("so serde"),
+                Token::U64(5),
+                Token::Seq { len: Some(1) },
+                Token::U8(42),
+                Token::SeqEnd,
+                Token::U64(6),
+                Token::U8(42),
+                Token::MapEnd,
+            ],
+        );
     }
 }
 
