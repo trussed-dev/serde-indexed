@@ -1,8 +1,104 @@
 /*! Derivation of [`Serialize`][serialize] and [`Deserialize`][deserialize] that replaces struct keys with numerical indices.
 
 ### Usage example
-The macros currently understand `serde`'s [`skip_serializing_if`][skip-serializing-if] field attribute
-and a custom `offset` container attribute.
+
+#### Struct attributes
+
+- `auto_index`: Automatically assign indices to the fields based on the order in the source code.  It is recommended to instead use the `index` attribute for all fields to explicitly assign indices.
+- `offset = ?`: If `auto_index` is set, use the given index for the first field instead of starting with zero.
+
+### Field attributes
+
+- `index = ?`: Set the index for this field to the given field.  This attribute is required unless `auto_index` is set.  It cannot be used together with `auto_index`.
+- `skip`: Never serialize or deserialize this field.  This field still increases the assigned index if `auto_index` is used.
+- `skip(no_increment)`: Never serialize or deserialize this field and don’t increment the assigned index for this field if used together with the `auto_index` attribute.
+
+`serde-indexed` also supports these `serde` attributes:
+- [`deserialize_with`][deserialize-with]
+- [`serialize_with`][serialize-with]
+- [`skip_serializing_if`][skip-serializing-if]
+- [`with`][with]
+
+### Generated code example
+`cargo expand --test basics` exercises the macros using [`serde_cbor`][serde-cbor].
+
+### Examples
+
+Explicit index assignment:
+
+```
+use serde_indexed::{DeserializeIndexed, SerializeIndexed};
+
+#[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
+pub struct SomeKeys {
+    #[serde(index = 1)]
+    pub number: i32,
+    #[serde(index = 2)]
+    pub option: Option<u8>,
+    #[serde(skip)]
+    pub ignored: bool,
+    #[serde(index = 3)]
+    pub bytes: [u8; 7],
+}
+```
+
+Automatic index assignment:
+
+```
+use serde_indexed::{DeserializeIndexed, SerializeIndexed};
+
+#[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
+#[serde(auto_index)]
+pub struct SomeKeys {
+    // index 1
+    pub number: i32,
+    // index 2
+    pub option: Option<u8>,
+    // index 3 (but skipped)
+    #[serde(skip)]
+    pub ignored: bool,
+    // index 4
+    pub bytes: [u8; 7],
+}
+```
+
+Automatic index assignment with `skip(no_increment)`:
+
+```
+use serde_indexed::{DeserializeIndexed, SerializeIndexed};
+
+#[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
+#[serde(auto_index)]
+pub struct SomeKeys {
+    // index 1
+    pub number: i32,
+    // index 2
+    pub option: Option<u8>,
+    #[serde(skip(no_increment))]
+    pub ignored: bool,
+    // index 3
+    pub bytes: [u8; 7],
+}
+```
+
+Automatic index assignment with `offset`:
+
+```
+use serde_indexed::{DeserializeIndexed, SerializeIndexed};
+
+#[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
+#[serde(auto_index, offset = 42)]
+pub struct SomeKeys {
+    // index 42
+    pub number: i32,
+    // index 43
+    pub option: Option<u8>,
+    // index 44
+    pub bytes: [u8; 7],
+}
+```
+
+Skip serializing a field based on a condition with `skip_serializing_if`:
 
 ```
 use serde_indexed::{DeserializeIndexed, SerializeIndexed};
@@ -18,11 +114,27 @@ pub struct SomeKeys {
 }
 ```
 
-### Generated code example
-`cargo expand --test basics` exercises the macros using [`serde_cbor`][serde-cbor].
+Change the serialization or deserialization format with `deserialize_with`, `serialize_with` or `with`:
+
+```
+use serde_indexed::{DeserializeIndexed, SerializeIndexed};
+
+#[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
+pub struct SomeKeys<'a> {
+    #[serde(index = 1, serialize_with = "serde_bytes::serialize")]
+    pub one: &'a [u8],
+    #[serde(index = 2, deserialize_with = "serde_bytes::deserialize")]
+    pub two: &'a [u8],
+    #[serde(index = 3, with = "serde_bytes")]
+    pub three: &'a [u8],
+}
+```
 
 [serialize]: https://docs.serde.rs/serde/ser/trait.Serialize.html
 [deserialize]: https://docs.serde.rs/serde/de/trait.Deserialize.html
+[deserialize-with]: https://serde.rs/field-attrs.html#deserialize_with
+[serialize-with]: https://serde.rs/field-attrs.html#serialize_with
+[with]: https://serde.rs/field-attrs.html#with
 [skip-serializing-if]: https://serde.rs/field-attrs.html#skip_serializing_if
 [serde-cbor]: https://docs.rs/serde_cbor
 */
