@@ -36,7 +36,7 @@ impl Skip {
 pub struct Field {
     pub label: String,
     pub member: syn::Member,
-    pub index: usize,
+    pub index: Option<usize>,
     pub skip_serializing_if: Skip,
     pub serialize_with: Option<syn::ExprPath>,
     pub deserialize_with: Option<syn::ExprPath>,
@@ -221,15 +221,24 @@ fn parse_field(
         }
     }
 
-    let index = if attrs.auto_index {
-        auto_index
+    if explicit_index.is_some() && skip_serializing_if.is_always() {
+        return Err(Error::new_spanned(
+            field,
+            "`#[serde(index = ?]` and `#[serde(skip)]` cannot be combined",
+        ));
+    }
+
+    let index = if skip_serializing_if.is_always() {
+        None
+    } else if attrs.auto_index {
+        Some(auto_index)
     } else if let Some(index) = explicit_index {
         indices.push(index);
-        index
+        Some(index)
     } else {
         return Err(Error::new_spanned(
             field,
-            "Field without index attribute and `#[serde(auto_index)]` is not enabled on the struct",
+            "Field without index or skip attribute and `#[serde(auto_index)]` is not enabled on the struct",
         ));
     };
     Ok(Field {

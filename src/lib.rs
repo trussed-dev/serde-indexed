@@ -53,8 +53,10 @@ fn serialize_fields(
 ) -> Vec<proc_macro2::TokenStream> {
     fields
         .iter()
-        .filter_map(|field| {
-            let index = field.index + offset;
+        .filter(|field| !field.skip_serializing_if.is_always())
+        .map(|field| {
+            // index should only be none if the field is always skipped, so this should never panic
+            let index = field.index.expect("index must be set for fields that are not skipped") + offset;
             let member = &field.member;
             let serialize_member = match &field.serialize_with {
                 None => quote!(&self.#member),
@@ -85,15 +87,15 @@ fn serialize_fields(
 
             // println!("field {:?} index {:?}", &field.label, field.index);
             match &field.skip_serializing_if {
-                Skip::If(path) => Some(quote! {
+                Skip::If(path) => quote! {
                     if !#path(&self.#member) {
                         map.serialize_entry(&#index, #serialize_member)?;
                     }
-                }),
-                Skip::Always => None,
-                Skip::Never => Some(quote! {
+                },
+                Skip::Always => unreachable!(),
+                Skip::Never => quote! {
                     map.serialize_entry(&#index, #serialize_member)?;
-                }),
+                },
             }
         })
         .collect()
@@ -222,7 +224,8 @@ fn match_fields(
         .map(|field| {
             let label = field.label.clone();
             let ident = format_ident!("{}", &field.label);
-            let index = field.index + offset;
+            // index should only be none if the field is always skipped, so this should never panic
+            let index = field.index.expect("index must be set for fields that are not skipped") + offset;
             let span = field.original_span;
 
             let next_value = match &field.deserialize_with {

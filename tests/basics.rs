@@ -629,6 +629,8 @@ mod index {
         test2: usize,
         #[serde(index = 0x5A)]
         test3: usize,
+        #[serde(skip)]
+        test4: usize,
     }
 
     fn indices_example() -> WithIndices {
@@ -636,6 +638,7 @@ mod index {
             test1: 42,
             test2: 1,
             test3: 99,
+            test4: 0,
         }
     }
 
