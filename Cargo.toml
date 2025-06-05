@@ -1,6 +1,6 @@
 [package]
 name = "serde-indexed"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Nicolas Stalder <n@stalder.io>", "The Trussed Developers"]
 license = "Apache-2.0 OR MIT"
 description = "Derivation of Serialize and Deserialize that replaces struct keys with numerical indices."

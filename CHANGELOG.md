@@ -2,7 +2,13 @@
 
 ## [Unreleased][]
 
-[Unreleased]: https://github.com/trussed-dev/serde-indexed/compare/0.1.1...HEAD
+[Unreleased]: https://github.com/trussed-dev/serde-indexed/compare/0.2.0...HEAD
+
+-
+
+## [v0.2.0][] (2025-06-05)
+
+[v0.2.0]: https://github.com/trussed-dev/serde-indexed/compare/0.1.1...0.2.0
 
 - Add support for `#[serde(with)]` ([#16][])
 - Add support for `#[serde(skip)]` ([#14][])
