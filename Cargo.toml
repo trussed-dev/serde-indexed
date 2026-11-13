@@ -19,8 +19,8 @@ quote = "1.0"
 syn = "2.0"
 
 [dev-dependencies]
-heapless = { version = "0.7.16", default-features = false, features = ["serde"] }
-hex-literal = "0.4.1"
+heapless = { version = "0.9", default-features = false, features = ["serde"] }
+hex-literal = "1"
 serde = { version = "1" }
 serde_bytes = { version = "0.11.15" }
 serde_cbor = { version = "0.11.0" }

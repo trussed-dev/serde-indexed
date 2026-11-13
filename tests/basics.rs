@@ -495,7 +495,9 @@ mod generics {
     }
 
     fn all_generics_example<'a, 'b>() -> WithAllGenerics<'a, 'b, String<5>, u8, 10, 3> {
-        let data1 = heapless::Vec::from_slice(&["abc".into(), "acdef".into()]).unwrap();
+        let data1 =
+            heapless::Vec::from_slice(&["abc".try_into().unwrap(), "acdef".try_into().unwrap()])
+                .unwrap();
         let data2 = heapless::Vec::from_slice(&[1, 2, 3]).unwrap();
 
         const BYTES: ByteArray<3> = ByteArray::new(*b"123");
