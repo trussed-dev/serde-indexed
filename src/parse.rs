@@ -215,7 +215,7 @@ fn parse_field(
                     explicit_index = Some(int);
                     Ok(())
                 } else {
-                    return Err(meta.error("Unkown field attribute"));
+                    Err(meta.error("Unkown field attribute"))
                 }
             })?;
         }
