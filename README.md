@@ -11,9 +11,12 @@ Primary use case is to handle [CTAP CBOR][ctap-cbor] messages, in particular sup
 
 #### Example
 
+
 ```rust
+use serde_indexed::{DeserializeIndexed, SerializeIndexed};
+
 #[derive(Clone, Debug, PartialEq, SerializeIndexed, DeserializeIndexed)]
-#[serde_indexed(offset = 1)]
+#[serde_indexed(auto_index, offset = 1)]
 pub struct SomeKeys {
     pub number: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -21,6 +24,7 @@ pub struct SomeKeys {
     pub bytes: [u8; 7],
 }
 ```
+
 
 This was a nice opportunity to learn proc-macros, I roughly followed [`serde-repr`][serde-repr].
 

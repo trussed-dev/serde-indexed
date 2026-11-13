@@ -231,7 +231,97 @@ mod some_keys {
                 Token::BorrowedBytes(&[42]),
                 Token::MapEnd,
             ],
-        )
+        );
+        assert_tokens(
+            &EmptyStruct {},
+            &[Token::Map { len: Some(0) }, Token::MapEnd],
+        );
+        assert_tokens(
+            &NakedOption {
+                option: Some(SomeKeys {
+                    number: 42,
+                    bytes: [1, 2, 3, 4, 5, 6, 7],
+                    string: "SomeString".try_into().unwrap(),
+                    option: Some(67),
+                    vector: [1, 2, 3].into(),
+                }),
+                num: 1,
+                key: true,
+            },
+            &[
+                Token::Map { len: Some(3) },
+                Token::U64(0),
+                Token::Some,
+                Token::Map { len: Some(5) },
+                Token::U64(1),
+                Token::I32(42),
+                Token::U64(2),
+                Token::Tuple { len: 7 },
+                Token::U8(1),
+                Token::U8(2),
+                Token::U8(3),
+                Token::U8(4),
+                Token::U8(5),
+                Token::U8(6),
+                Token::U8(7),
+                Token::TupleEnd,
+                Token::U64(3),
+                Token::Str("SomeString"),
+                Token::U64(4),
+                Token::Some,
+                Token::U8(67),
+                Token::U64(5),
+                Token::Seq { len: Some(3) },
+                Token::U8(1),
+                Token::U8(2),
+                Token::U8(3),
+                Token::SeqEnd,
+                Token::MapEnd,
+                Token::U64(1),
+                Token::U64(1),
+                Token::U64(2),
+                Token::Bool(true),
+                Token::MapEnd,
+            ],
+        );
+        assert_tokens(
+            &NakedRefOption {
+                option: Some(SomeRefKeys {
+                    number: 42,
+                    ignored: 0,
+                    ignored2: 0,
+                    bytes: &ByteArray::from([1, 2, 3, 4, 5, 6, 7]),
+                    string: "SomeString".try_into().unwrap(),
+                    option: Some(67),
+                    vector: Bytes::new(&[1, 2, 3]),
+                }),
+                num: 1,
+                key: true,
+            },
+            &[
+                Token::Map { len: Some(3) },
+                Token::U64(0),
+                Token::Some,
+                Token::Map { len: Some(5) },
+                Token::U64(1),
+                Token::I32(42),
+                Token::U64(3),
+                Token::BorrowedBytes(&[1, 2, 3, 4, 5, 6, 7]),
+                Token::U64(4),
+                Token::BorrowedStr("SomeString"),
+                Token::U64(5),
+                Token::Some,
+                Token::U8(67),
+                Token::U64(6),
+                Token::BorrowedBytes(&[1, 2, 3]),
+                Token::MapEnd,
+                Token::U64(1),
+                Token::U64(1),
+                Token::U64(2),
+                Token::Bool(true),
+                Token::MapEnd,
+            ],
+        );
     }
 
     #[test]
@@ -495,7 +585,9 @@ mod generics {
     }
 
     fn all_generics_example<'a, 'b>() -> WithAllGenerics<'a, 'b, String<5>, u8, 10, 3> {
-        let data1 = heapless::Vec::from_slice(&["abc".into(), "acdef".into()]).unwrap();
+        let data1 =
+            heapless::Vec::from_slice(&["abc".try_into().unwrap(), "acdef".try_into().unwrap()])
+                .unwrap();
         let data2 = heapless::Vec::from_slice(&[1, 2, 3]).unwrap();
 
         const BYTES: ByteArray<3> = ByteArray::new(*b"123");
